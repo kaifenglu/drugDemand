@@ -78,7 +78,7 @@ DataFrame f_dose_ongoing_cpp(const StringVector usubjid,
     Ti = rtnormcpp((ki+1)*muT, sigmaT, C(i) - Vi, R_PosInf);
     Ti = std::max(std::round(Ti), 0.0);
 
-    while (Vi + Ti < D(i)) {
+    while (Vi + Ti <= D(i)) {
       // next dispensing visit
       Vi = Vi + Ti;
 
@@ -111,7 +111,7 @@ DataFrame f_dose_ongoing_cpp(const StringVector usubjid,
 
       // time from Vi to the first drug dispensing visit after data cut
       Ti = rtnormcpp((ki+1)*muT, sigmaT, C(i) - Vi, R_PosInf);
-      Ti = std::max(std::round(Ti), 0.0);
+      Ti = std::max(std::round(Ti), 1.0);
     }
   }
 
@@ -271,7 +271,7 @@ DataFrame f_dose_new_cpp(const StringVector usubjid,
     Ti = std::max(std::round(Ti), 0.0);
 
     // generate drug dispensing visits
-    while (Vi + Ti < D(i)) {
+    while (Vi + Ti <= D(i)) {
       // next dispensing visit
       Vi = Vi + Ti;
 
@@ -304,7 +304,7 @@ DataFrame f_dose_new_cpp(const StringVector usubjid,
 
       // time from Vi to the first drug dispensing visit after data cut
       Ti = rtnormcpp((ki+1)*muT, sigmaT, C(i) - Vi, R_PosInf);
-      Ti = std::max(std::round(Ti), 0.0);
+      Ti = std::max(std::round(Ti), 1.0);
     }
   }
 

@@ -2,9 +2,9 @@
 #' @aliases drugDemand-package
 #' @docType package
 #'
-#' @title Drug Demand Prediction by Modeling Drug Dispensing Data
+#' @title Drug Demand Forecast
 #'
-#' @description Performs drug demand prediction by modeling drug
+#' @description Performs drug demand forecast by modeling drug
 #' dispensing data along with predicted enrollment and
 #' treatment discontinuation dates.
 #'
