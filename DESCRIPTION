@@ -1,0 +1,34 @@
+Package: drugDemand
+Type: Package
+Title: Drug Demand Forecast
+Version: 0.1.0
+Date: 2023-10-17
+Author: Kaifeng Lu
+Maintainer: Kaifeng Lu <kaifenglu@gmail.com>
+Description: Performs drug demand forecast by modeling drug dispensing data along with predicted enrollment and treatment discontinuation dates.
+License: GPL (>= 2)
+Imports: 
+    Rcpp (>= 1.0.10),
+    dplyr (>= 1.1.0),
+    rlang (>= 1.1.0),
+    purrr (>= 1.0.2),
+    plotly (>= 4.10.1),
+    survival (>= 2.41-3),
+    mvtnorm (>= 1.1-3),
+    erify (>= 0.4.0),
+    stats (>= 3.5.0),
+    icenReg (>= 2.0.15),
+    pscl (>= 1.5.5),
+    nlme (>= 3.1-153),
+    eventPred (>= 0.2.0),
+    parallel (>= 4.1.2),
+    foreach (>= 1.5.2),
+    doParallel (>= 1.0.17),
+    doRNG (>= 1.8.6)
+LinkingTo: Rcpp
+Depends: 
+    R (>= 3.5.0)
+LazyData: true
+RoxygenNote: 7.2.3
+Encoding: UTF-8
+NeedsCompilation: yes
