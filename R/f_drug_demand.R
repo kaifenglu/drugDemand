@@ -4,10 +4,13 @@
 #'
 #' @param treatment_by_drug The indicator matrix of treatment by drug
 #'   combinations.
-#' @param drug_name The drug names.
+#' @param drug_name The name of the drug.
 #' @param dose_unit The dose unit used for drug dispensing.
 #'
-#' @return A data frame that indicates the treatment(s) for each drug.
+#' @return A data frame indicating the treatments
+#' associated with each drug, including the following variables:
+#' \code{treatment}, \code{drug}, \code{drug_name}, and
+#' \code{dose_unit}.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -15,10 +18,8 @@
 #'
 #' drug_name = drug_description_df$drug_name
 #' dose_unit = drug_description_df$dose_unit
-#'
 #' treatment_by_drug_df <- f_treatment_by_drug_df(
 #'   treatment_by_drug, drug_name, dose_unit)
-#'
 #' treatment_by_drug_df
 #'
 #' @export
@@ -43,19 +44,20 @@ f_treatment_by_drug_df <- function(
 #' @description Obtains drug demand prediction via modeling and
 #' simulation.
 #'
-#' @param df The subject level enrollment and event data.
-#'   It should contain the following variables:
+#' @param df A data frame for subject-level enrollment and event data,
+#'   including the following variables:
 #'   \code{trialsdt}, \code{usubjid}, \code{randdt},
 #'   \code{treatment}, \code{treatment_description},
 #'   \code{time}, \code{event}, \code{dropout}, and \code{cutoffdt}.
-#' @param newEvents The imputed event data for ongoing and new patients
-#'   from the output of the eventPred::getPrediction function call.
+#' @param newEvents A data frame containing the imputed event data
+#'   for both ongoing and new patients, typically obtained from
+#'   the output of the \code{eventPred::getPrediction} function.
 #'   It contains the following variables:
 #'   \code{draw}, \code{usubjid}, \code{arrivalTime}, \code{treatment},
 #'   \code{treatment_description}, \code{time}, \code{event},
-#'   \code{dropout}, \code{totalTime}.
-#' @param visitview The observed subject drug dispensing data. It
-#'   should contain the following variables:
+#'   \code{dropout}, and \code{totalTime}.
+#' @param visitview A data frame containing the observed drug dispensing
+#'   data, including the following variables:
 #'   \code{usubjid}, \code{visit}, \code{date}, \code{drug},
 #'   \code{drug_name}, \code{dose_unit}, \code{kit_number}, and
 #'   \code{dispensed_quantity}.
@@ -65,38 +67,37 @@ f_treatment_by_drug_df <- function(
 #'   the observed information at the analysis stage.
 #' @param treatment_by_drug The indicator matrix of treatment by drug
 #'   combinations.
-#' @param dosing_schedule_df The dosing schedule data frame specifying
-#'   the target_days, target_kits, and max_cycles for each drug.
+#' @param dosing_schedule_df A data frame providing dosing schedule
+#'   information. It contains the following variables: \code{drug},
+#'   \code{target_days}, \code{target_kits}, and \code{max_cycles}.
 #' @param model_k0 The model for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
 #' @param model_t0 The model for the gap time between randomization
-#'   and the first drug dispensing visit with no skipping.
+#'   and the first drug dispensing visit when there is no visit skipping.
 #' @param model_ki The model for the number of skipped
 #'   visits between two consecutive drug dispensing visits.
 #' @param model_di The model for the dispensed doses at drug
 #'   dispensing visits.
-#' @param pilevel The prediction interval level. By default,
-#'   it is set to 0.90.
+#' @param pilevel The prediction interval level.
 #' @param nyears The number of years after the data cut for prediction.
-#'   By default, it is set to 4.
-#' @param nreps The number of replications for simulation. By default,
-#'   it is set to 500.
-#' @param showplot A Boolean variable to control whether or not to
-#'   show the plots. By default, it is set to \code{TRUE}.
+#' @param nreps The number of replications for simulation.
+#' @param showplot A Boolean variable that controls whether or not to
+#'   show the drug dispensing model fit and drug demand prediction
+#'   plots. It defaults to \code{TRUE}.
 #'
 #' @return A list with the following components:
 #'
-#' * \code{common_time_model} A Boolean variable to indicate whether
-#' a common time model is used for drug dispensing visit timing.
+#' * \code{common_time_model} A Boolean variable that indicates whether
+#' a common time model is used for drug dispensing visits.
 #'
 #' * \code{fit_k0} The model fit for the number of skipped
 #' visits between randomization and the first drug dispensing visit.
 #'
 #' * \code{fit_t0} The model fit for the gap time between randomization
-#' and the first drug dispensing visit with no skipping.
+#' and the first drug dispensing visit when there is no visit skipping.
 #'
 #' * \code{fit_t1} The model fit for the gap time between randomization
-#' and the first drug dispensing visit with skipping.
+#' and the first drug dispensing visit when there is visit skipping.
 #'
 #' * \code{fit_ki} The model fit for the number of skipped
 #' visits between two consecutive drug dispensing visits.
@@ -107,16 +108,16 @@ f_treatment_by_drug_df <- function(
 #' * \code{fit_di} The model fit for the dispensed doses at drug
 #' dispensing visits.
 #'
-#' * \code{dosing_subject} The data frame for the observed and imputed
-#' subject level dosing records.
+#' * \code{dosing_subject} A data frame for the observed and imputed
+#' subject-level dosing records.
 #'
-#' * \code{dosing_pred_df} The data frame for dosing summary by drug and
+#' * \code{dosing_pred_df} A data frame for dosing summary by drug and
 #' time point.
 #'
-#' * \code{dosing_pred_pp} The data frame for dosing summary by drug and
+#' * \code{dosing_pred_pp} A data frame for dosing summary by drug and
 #' time point per protocol.
 #'
-#' * \code{dosing_pred_plot} The plot object for dosing prediction.
+#' * \code{dosing_pred_plot} A plot object for dosing prediction.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'

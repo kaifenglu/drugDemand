@@ -1,13 +1,13 @@
 #' @title Cumulative Dose
-#' @description Obtains cumulative dose given treatment duration and
+#' @description Obtains the cumulative dose given treatment duration and
 #' dosing schedule.
 #'
-#' @param x Treatment duration.
-#' @param w Number of days per treatment cycle for the drug.
-#' @param d Number of kits per treatment cycle for the drug.
-#' @param N Maximum number of treatment cycles for the drug.
+#' @param x The treatment duration.
+#' @param w The number of days per treatment cycle for the drug.
+#' @param d The number of kits per treatment cycle for the drug.
+#' @param N The maximum number of treatment cycles for the drug.
 #'
-#' @return The cumulative dose to dispense for the drug for given
+#' @return The cumulative dose to dispense for the drug over a specified
 #' treatment duration.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
@@ -28,32 +28,33 @@ f_cum_dose <- function(x, w, d, N) {
 }
 
 
-#' @title Drug Per Protocol
-#' @description Obtains drug demand prediction based on protocol assumed
+#' @title Drug Demand Per Protocol
+#' @description Obtains drug demand prediction based on protocol-assumed
 #' visit and dosing schedules.
 #'
-#' @param dosing_summary_t0 The observed cumulative doses dispensed
-#'   before cutoff by drug. It contains the following variables:
+#' @param dosing_summary_t0 The cumulative doses dispensed
+#'   before the cutoff date. It contains the following variables:
 #'   \code{drug}, \code{drug_name}, \code{dose_unit},
 #'   and \code{cum_dose_t0}.
-#' @param newEvents The imputed event data for ongoing and new patients
-#'   from the output of the eventPred::getPrediction function call.
+#' @param newEvents A data frame containing the imputed event data
+#'   for both ongoing and new patients, typically obtained from
+#'   the output of the \code{eventPred::getPrediction} function.
 #'   It contains the following variables:
 #'   \code{draw}, \code{usubjid}, \code{arrivalTime}, \code{treatment},
 #'   \code{treatment_description}, \code{time}, \code{event},
 #'   \code{dropout}, and \code{totalTime}.
-#' @param treatment_by_drug_df The data frame that indicates the
-#'   treatment(s) associated with each drug. It contains the following
-#'   variables: \code{treatment}, \code{drug}, \code{drug_name},
-#'   and \code{dose_unit}.
-#' @param dosing_schedule_df The dosing schedule data frame. It contains
-#'   the following variables: \code{drug}, \code{target_days},
-#'   \code{target_kits}, and \code{max_cycles}.
-#' @param t0 The cutoff date relative to trial start.
-#' @param t The vector of new time points for drug dispensing prediction.
+#' @param treatment_by_drug_df A data frame indicating the treatments
+#'   associated with each drug, including the following variables:
+#'   \code{treatment}, \code{drug}, \code{drug_name}, and
+#'   \code{dose_unit}.
+#' @param dosing_schedule_df A data frame providing dosing schedule
+#'   information. It contains the following variables: \code{drug},
+#'   \code{target_days}, \code{target_kits}, and \code{max_cycles}.
+#' @param t0 The cutoff date relative to the trial start date.
+#' @param t A vector of new time points for drug dispensing predictions.
 #' @param pilevel The prediction interval level.
 #'
-#' @return The data frame for dosing summary by drug and time point per
+#' @return A data frame for dosing summary by drug and time point per
 #' protocol. It contains the following variables:
 #' \code{drug}, \code{drug_name}, \code{dose_unit}, \code{t}, \code{n},
 #' \code{pilevel}, \code{lower}, \code{upper}, \code{mean},
@@ -64,7 +65,8 @@ f_cum_dose <- function(x, w, d, N) {
 #' @examples
 #'
 #' \dontrun{
-#' # Design stage drug demand prediction per protocol.
+#' # Design stage drug demand predictions per protocol.
+#'
 #' set.seed(312)
 #' library(dplyr)
 #'
@@ -106,11 +108,10 @@ f_cum_dose <- function(x, w, d, N) {
 #'
 #' newEvents <- pred$event_pred$newEvents
 #'
-#' treatment_by_drug_df <- dplyr::tibble(
-#'   treatment = c(1, 1, 2, 2, 3, 3),
-#'   drug = c(1, 2, 3, 4, 1, 4)) %>%
-#'   dplyr::left_join(drug_description_df, by = "drug") %>%
-#'   dplyr::arrange(drug)
+#' drug_name = drug_description_df$drug_name
+#' dose_unit = drug_description_df$dose_unit
+#' treatment_by_drug_df <- f_treatment_by_drug_df(
+#'   treatment_by_drug, drug_name, dose_unit)
 #'
 #' t0 = 1
 #' nyears = 3
