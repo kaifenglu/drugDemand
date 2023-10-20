@@ -1,11 +1,11 @@
 Package: drugDemand
 Type: Package
-Title: Drug Demand Forecast
+Title: Drug Demand Forecasting
 Version: 0.1.0
-Date: 2023-10-17
+Date: 2023-10-20
 Author: Kaifeng Lu
 Maintainer: Kaifeng Lu <kaifenglu@gmail.com>
-Description: Performs drug demand forecast by modeling drug dispensing data along with predicted enrollment and treatment discontinuation dates.
+Description: Performs drug demand forecasting by modeling drug dispensing data while taking into account predicted enrollment and treatment discontinuation dates.
 License: GPL (>= 2)
 Imports: 
     Rcpp (>= 1.0.10),
