@@ -64,7 +64,7 @@ f_cum_dose <- function(x, w, d, N) {
 #'
 #' @examples
 #'
-#' \dontrun{
+#' \donttest{
 #' # Design stage drug demand predictions per protocol.
 #'
 #' set.seed(312)

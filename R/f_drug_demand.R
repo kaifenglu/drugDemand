@@ -81,6 +81,9 @@ f_treatment_by_drug_df <- function(
 #' @param pilevel The prediction interval level.
 #' @param nyears The number of years after the data cut for prediction.
 #' @param nreps The number of replications for simulation.
+#' @param n.cores.max The maximum number of cores to use for parallel
+#'   computing. The actual number of cores used will be the minimum of
+#'   \code{n.cores.max} and half of the detected number of cores.
 #' @param showplot A Boolean variable that controls whether or not to
 #'   show the drug dispensing model fit and drug demand prediction
 #'   plots. It defaults to \code{TRUE}.
@@ -123,7 +126,7 @@ f_treatment_by_drug_df <- function(
 #'
 #' @examples
 #'
-#' \dontrun{
+#' \donttest{
 #' set.seed(529)
 #'
 #' tictoc::tic("event prediction")
@@ -158,6 +161,7 @@ f_treatment_by_drug_df <- function(
 #'   pilevel = 0.95,
 #'   nyears = 1,
 #'   nreps = 200,
+#'   n.cores.max = 2,
 #'   showplot = FALSE)
 #'
 #' tictoc::toc()
@@ -180,6 +184,7 @@ f_drug_demand <- function(
     pilevel = 0.9,
     nyears = 4,
     nreps = 500,
+    n.cores.max = 10,
     showplot = TRUE) {
 
   if (is.null(newEvents)) {
@@ -295,7 +300,8 @@ f_drug_demand <- function(
     a <- f_dosing_draw(df, vf, newEvents, treatment_by_drug_df,
                        fit$common_time_model,
                        fit$fit_k0, fit$fit_t0, fit$fit_t1,
-                       fit$fit_ki, fit$fit_ti, fit$fit_di, t0, t)
+                       fit$fit_ki, fit$fit_ti, fit$fit_di, t0, t,
+                       n.cores.max)
 
 
     # subject level dosing data for the first simulation run

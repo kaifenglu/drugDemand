@@ -24,7 +24,7 @@
 #'
 #' @examples
 #'
-#' \dontrun{
+#' \donttest{
 #' set.seed(431)
 #' library(dplyr)
 #'
@@ -292,7 +292,7 @@ f_dosing_draw_t_1 <- function(
 #'
 #' @examples
 #'
-#' \dontrun{
+#' \donttest{
 #' set.seed(431)
 #' library(dplyr)
 #'
@@ -557,6 +557,9 @@ f_dosing_draw_1 <- function(
 #'   dispensing visits.
 #' @param t0 The cutoff date relative to the trial start date.
 #' @param t A vector of new time points for drug dispensing predictions.
+#' @param n.cores.max The maximum number of cores to use for parallel
+#'   computing. The actual number of cores used will be the minimum of
+#'   \code{n.cores.max} and half of the detected number of cores.
 #'
 #' @return A list with two components:
 #'
@@ -578,7 +581,7 @@ f_dosing_draw_1 <- function(
 #'
 #' @examples
 #'
-#' \dontrun{
+#' \donttest{
 #' set.seed(431)
 #' library(dplyr)
 #'
@@ -636,7 +639,8 @@ f_dosing_draw_1 <- function(
 #'   df, vf, newEvents, treatment_by_drug_df,
 #'   fit$common_time_model,
 #'   fit$fit_k0, fit$fit_t0, fit$fit_t1,
-#'   fit$fit_ki, fit$fit_ti, fit$fit_di, t0, t)
+#'   fit$fit_ki, fit$fit_ti, fit$fit_di, t0, t,
+#'   n.cores.max = 2)
 #'
 #' head(a$dosing_subject_new)
 #' head(a$dosing_summary_new)
@@ -647,7 +651,8 @@ f_dosing_draw <- function(
     df, vf, newEvents, treatment_by_drug_df,
     common_time_model,
     fit_k0, fit_t0, fit_t1,
-    fit_ki, fit_ti, fit_di, t0, t) {
+    fit_ki, fit_ti, fit_di, t0, t,
+    n.cores.max) {
 
   nreps = length(unique(newEvents$draw))
   l = length(unique(treatment_by_drug_df$drug))
@@ -753,7 +758,7 @@ f_dosing_draw <- function(
 
 
   # register parallel backend
-  n.cores <- min(parallel::detectCores()/2, 10)
+  n.cores <- min(n.cores.max, parallel::detectCores()/2)
   cl <- parallel::makeCluster(n.cores)
   doParallel::registerDoParallel(cl)
 

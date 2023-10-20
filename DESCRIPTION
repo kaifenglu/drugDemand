@@ -3,9 +3,10 @@ Type: Package
 Title: Drug Demand Forecasting
 Version: 0.1.0
 Date: 2023-10-20
-Author: Kaifeng Lu
-Maintainer: Kaifeng Lu <kaifenglu@gmail.com>
-Description: Performs drug demand forecasting by modeling drug dispensing data while taking into account predicted enrollment and treatment discontinuation dates.
+Authors@R: 
+    person("Kaifeng", "Lu", , "kaifenglu@gmail.com", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0002-6160-7119"))
+Description: Performs drug demand forecasting by modeling drug dispensing data while taking into account predicted enrollment and treatment discontinuation dates. The number of skipped visits and the number of dispensed doses are modeled using zero-inflated Poisson or zero-inflated negative binomial distributions (Zeileis, Kleiber & Jackman (2008) <doi:10.18637/jss.v027.i08>) and a linear mixed-effects model (McCulloch & Searle (2001, ISBN:0-471-19364-X)), respectively.
 License: GPL (>= 2)
 Imports: 
     Rcpp (>= 1.0.10),
@@ -24,7 +25,8 @@ Imports:
     parallel (>= 4.1.2),
     foreach (>= 1.5.2),
     doParallel (>= 1.0.17),
-    doRNG (>= 1.8.6)
+    doRNG (>= 1.8.6),
+    tictoc (>= 1.2)
 LinkingTo: Rcpp
 Depends: 
     R (>= 3.5.0)

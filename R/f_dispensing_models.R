@@ -793,6 +793,8 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
 #'   model_k0 = "zip", model_t0 = "log-logistic",
 #'   model_ki = "zip", model_di = "lme",
 #'   nreps = 200, showplot = FALSE)
+#'
+#' fit$fit_ki$fit_plot
 #
 #' @export
 f_dispensing_models <- function(

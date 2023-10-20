@@ -6,11 +6,16 @@
 #'
 #' @description Performs drug demand forecasting by modeling drug
 #' dispensing data while taking into account predicted enrollment
-#' and treatment discontinuation dates.
+#' and treatment discontinuation dates. The number of skipped
+#' visits and the number of dispensed doses are modeled using
+#' zero-inflated Poisson or zero-inflated negative binomial distributions
+#' (Zeileis, Kleiber & Jackman (2008) <doi:10.18637/jss.v027.i08>)
+#' and a linear mixed-effects model
+#' (McCulloch & Searle (2001, ISBN:0-471-19364-X)), respectively.
 #'
 #' @details In clinical trials, patients do not always follow
 #' protocol-specified visit and drug dispensing schedules.
-#' Patients may encounter delays in there drug dispensing
+#' Patients may encounter delays in their drug dispensing
 #' appointments, skip visits altogether, or receive doses
 #' different from the protocol-specified target.
 #' Relying solely on protocol-based predictions tends to result
@@ -58,6 +63,16 @@
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
+#' @references
+#' Achim Zeileis, Christian Kleiber, and Simon Jackman.
+#' Regression models for count data in R.
+#' J Stat Softw. 2008, Volume 27, Issue 8.
+#'
+#' Charles E. McCulloch and Shayler R. Searle.
+#' Generalized, Linear, and Mixed Models.
+#' John Wiley & Sons: New York, 2001,
+#' ISBN:0-471-19364-X
+#'
 #' @useDynLib drugDemand, .registration = TRUE
 #' @importFrom Rcpp evalCpp
 #' @importFrom mvtnorm pmvnorm rmvnorm
@@ -80,6 +95,7 @@
 #' @importFrom rlang .data
 #' @importFrom purrr map_dfr
 #' @importFrom eventPred getPrediction
+#' @importFrom tictoc tic toc
 #'
 NULL
 
