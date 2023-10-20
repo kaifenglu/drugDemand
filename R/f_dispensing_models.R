@@ -1,31 +1,49 @@
-#' @title Time-to-Event Model for Dispensing Delay After Randomization
+#' @title Time-to-Event Model Fit for Dispensing Delay After Randomization
 #' @description Fits a specified time-to-event model to the gap time
-#' between randomization and the first drug dispensing visit if
+#' between randomization and the first drug dispensing visit when
 #' there is no visit skipping.
 #'
-#' @param df The subject-level event data, including \code{time},
-#'   \code{status}, \code{left}, and \code{right}. Here
-#'   \code{time = first drug dispensing date - randomization date + 1},
-#'   \code{status = 1} to indicate event, \code{left = time - 1} and
-#'   \code{right = time} to indicate interval censoring.
-#' @param model The event model used to analyze the event data
-#'   which can be set to one of the following options:
-#'   "constant", "exponential", "weibull", "log-logistic", and
-#'   "log-normal".
-#' @param nreps The number of simulations for posterior draw of model
-#'   parameters.
-#' @param showplot A Boolean variable to control whether or not to
-#'   show the fitted time-to-event bar chart. By default, it is
-#'   set to \code{TRUE}.
+#' @param df The subject-level dosing data, including the following
+#'   variables:
 #'
-#' @return A list of results from the model fit including key
-#'   information such as the event model, \code{model}, the estimated
-#'   model parameters, \code{theta}, the covariance matrix,
-#'   \code{vtheta}, as well as the Akaike Information Criterion,
-#'   \code{aic}, and Bayesian Information Criterion, \code{bic}.
+#'   * \code{time}: The number of days between randomization to the
+#'   first drug dispensing visit (first drug dispensing date -
+#'   randomization date + 1).
 #'
-#' The fitted time-to-event bar chart and the posterior draw of model
-#' parameters are also provided.
+#'   * \code{status}: The event indicator which equals 1.
+#'
+#'   * \code{left}: Equals \code{time - 1}, used to indicate the
+#'   left endpoint of an interval for interval censoring.
+#'
+#'   * \code{right}: Equals \code{time}, used to indicate the
+#'   right endpoint of an interval for interval censoring.
+#'
+#' @param model The event model used to analyze the gap time
+#'   between randomization and the first drug dispensing visit when
+#'   there is no visit skipping, with options including "constant",
+#'   "exponential", "weibull", "log-logistic", and "log-normal".
+#' @param nreps The number of simulations for drawing posterior model
+#'   parameter values.
+#' @param showplot A Boolean variable that controls whether or not to
+#'   show the fitted time-to-event bar chart. It defaults to \code{TRUE}.
+#'
+#' @return A list of results from the model fit that includes
+#'
+#' * \code{model}: The specific model used in the analysis.
+#'
+#' * \code{theta}: The estimated model parameters.
+#'
+#' * \code{vtheta}: The estimated covariance matrix of \code{theta}.
+#'
+#' * \code{aic}: The Akaike Information Criterion value for the model fit.
+#'
+#' * \code{bic}: The Bayesian Information Criterion value for the model fit.
+#'
+#' Additionally, the function provides:
+#'
+#' * A fitted time-to-event bar chart.
+#'
+#' * Posterior draws of model parameters.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -33,35 +51,31 @@
 #' library(dplyr)
 #'
 #' df <- df2 %>%
-#' mutate(arrivalTime = as.numeric(.data$randdt - trialsdt + 1))
+#'   mutate(arrivalTime = as.numeric(randdt - trialsdt + 1))
 #'
 #' vf <- visitview2 %>%
 #'   inner_join(df, by = "usubjid") %>%
 #'   mutate(day = as.numeric(date - randdt + 1)) %>%
-#'   select(drug, drug_name, dose_unit,
-#'          usubjid, treatment,
+#'   select(drug, drug_name, dose_unit, usubjid, treatment,
 #'          treatment_description, arrivalTime,
-#'          time, event, dropout,
-#'          day, dispensed_quantity) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid, treatment,
+#'          time, event, dropout, day, dispensed_quantity) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid, treatment,
 #'            treatment_description, arrivalTime,
-#'            time, event, dropout,
-#'            day) %>%
+#'            time, event, dropout, day) %>%
 #'   summarise(dose = sum(dispensed_quantity),
 #'             .groups = "drop_last") %>%
 #'   mutate(cum_dose = cumsum(dose)) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid) %>%
 #'   mutate(row_id = row_number())
 #'
-#' delta = dosing_schedule_df$target_days[1]
+#' vf <- vf %>%
+#'   left_join(dosing_schedule_df, by = "drug")
 #'
 #' # time from randomization to the first drug dispensing visit
 #' df_k0 <- vf %>%
 #'   filter(row_id == 1) %>%
 #'   mutate(time = day,
-#'          skipped = floor((time - delta/2)/delta) + 1)
+#'          skipped = floor((time - target_days/2)/target_days) + 1)
 #'
 #' df_t0 <- df_k0 %>%
 #'   filter(skipped == 0) %>%
@@ -205,29 +219,37 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 }
 
 
-#' @title Count Model for Number of Skipped Visits
+#' @title Count Model Fit for Number of Skipped Visits
 #' @description Fits a count model to the number of skipped visits.
 #'
-#' @param df The subject-level event data, including \code{skipped} to
+#' @param df The subject-level dosing data, including \code{skipped} to
 #'   indicate the number of skipped visits.
 #' @param model The count model used to analyze the number of
-#'   skipped visits, which can be set to one of the following options:
+#'   skipped visits, with options including
 #'   "constant", "poisson", "zip" for zero-inflated Poisson, and
 #'   "zinb" for zero-inflated negative binomial.
-#' @param nreps The number of simulations for posterior draw of model
-#'   parameters.
-#' @param showplot A Boolean variable to control whether or not to
-#'   show the fitted count bar chart. By default, it is
-#'   set to \code{TRUE}.
+#' @param nreps The number of simulations for drawing posterior model
+#'   parameter values.
+#' @param showplot A Boolean variable that controls whether or not to
+#'   show the fitted count bar chart. It defaults to \code{TRUE}.
 #'
-#' @return A list of results from the model fit including key
-#'   information such as the count model, \code{model}, the estimated
-#'   model parameters, \code{theta}, the covariance matrix,
-#'   \code{vtheta}, as well as the Akaike Information Criterion,
-#'   \code{aic}, and Bayesian Information Criterion, \code{bic}.
+#' @return A list of results from the model fit that includes
 #'
-#' The fitted count bar chart and the posterior draw of model parameters
-#' are also returned.
+#' * \code{model}: The specific model used in the analysis.
+#'
+#' * \code{theta}: The estimated model parameters.
+#'
+#' * \code{vtheta}: The estimated covariance matrix of \code{theta}.
+#'
+#' * \code{aic}: The Akaike Information Criterion value for the model fit.
+#'
+#' * \code{bic}: The Bayesian Information Criterion value for the model fit.
+#'
+#' Additionally, the function provides:
+#'
+#' * A fitted count bar chart.
+#'
+#' * Posterior draws of model parameters.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -235,35 +257,31 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 #' library(dplyr)
 #'
 #' df <- df2 %>%
-#' mutate(arrivalTime = as.numeric(.data$randdt - trialsdt + 1))
+#' mutate(arrivalTime = as.numeric(randdt - trialsdt + 1))
 #'
 #' vf <- visitview2 %>%
 #'   inner_join(df, by = "usubjid") %>%
 #'   mutate(day = as.numeric(date - randdt + 1)) %>%
-#'   select(drug, drug_name, dose_unit,
-#'          usubjid, treatment,
+#'   select(drug, drug_name, dose_unit, usubjid, treatment,
 #'          treatment_description, arrivalTime,
-#'          time, event, dropout,
-#'          day, dispensed_quantity) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid, treatment,
+#'          time, event, dropout, day, dispensed_quantity) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid, treatment,
 #'            treatment_description, arrivalTime,
-#'            time, event, dropout,
-#'            day) %>%
+#'            time, event, dropout, day) %>%
 #'   summarise(dose = sum(dispensed_quantity),
 #'             .groups = "drop_last") %>%
 #'   mutate(cum_dose = cumsum(dose)) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid) %>%
 #'   mutate(row_id = row_number())
 #'
-#' delta = dosing_schedule_df$target_days[1]
+#' vf <- vf %>%
+#'   left_join(dosing_schedule_df, by = "drug")
 #'
 #' # time from randomization to the first drug dispensing visit
 #' df_k0 <- vf %>%
 #'   filter(row_id == 1) %>%
 #'   mutate(time = day,
-#'          skipped = floor((time - delta/2)/delta) + 1)
+#'          skipped = floor((time - target_days/2)/target_days) + 1)
 #'
 #' fit_k0 <- f_fit_ki(df_k0, model = "zip", nreps = 200)
 #'
@@ -406,28 +424,49 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 }
 
 
-#' @title Linear Regression for Gap Times
+#' @title Linear Regression Model Fit for Gap Times
 #' @description Fits a linear regression model to the gap times.
 #'
-#' @param df The subject-level event data, including \code{time}
-#'   and \code{k1}, where \code{k1} is the covariate,
-#'   \code{k1 = skipped} for gap time between randomization and
-#'   the first drug dispensing visit and \code{k1 = skipped + 1}
-#'   for gap between two consecutive drug dispensing visits.
-#' @param model The model for the gap time. Currently, only the linear
-#'   model ("lm") is supported.
-#' @param nreps The number of simulations for posterior draw of model
-#'   parameters.
-#' @param showplot A Boolean variable to control whether or not to
-#'   show the residual plot. By default, it is set to \code{TRUE}.
+#' @param df The subject-level dosing data, including the following
+#'   variables:
 #'
-#' @return A list of results from the regression model fit including
-#' \code{model}, \code{beta}, \code{vbeta}, \code{sigma}, \code{df},
-#' as well as the Akaike Information Criterion, \code{aic}, and
-#' Bayesian Information Criterion, \code{bic}.
+#'   * \code{time}: The gap time to the next drug dispensing visit.
 #'
-#' The residual plot and the posterior draw of model parameters are
-#' also provided.
+#'   * \code{skipped}: The number of skipped visits.
+#'
+#'   * \code{k1}: The covariate for the linear regression. It equals
+#'   \code{skipped} for the gap time between randomization and
+#'   the first drug dispensing visit and \code{skipped + 1}
+#'   for the gap time between two consecutive drug dispensing visits.
+#'
+#' @param model The model used to analyze the gap time.
+#'   Currently, it only supports the linear model ("lm").
+#' @param nreps The number of simulations for drawing posterior model
+#'   parameter values.
+#' @param showplot A Boolean variable that controls whether or not to
+#'   show the residual plot. It defaults to \code{TRUE}.
+#'
+#' @return A list of results from the regression model fit, including
+#'
+#' * \code{model}: The specific model used in the analysis.
+#'
+#' * \code{beta}: The estimated regression coefficient for the covariate.
+#'
+#' * \code{vbeta}: The estimated variance of \code{beta}.
+#'
+#' * \code{sigma}: The estimated residual standard deviation.
+#'
+#' * \code{df}: The residual degrees-of-freedom.
+#'
+#' * \code{aic}: The Akaike Information Criterion value for the model fit.
+#'
+#' * \code{bic}: The Bayesian Information Criterion value for the model fit.
+#'
+#' Additionally, the function provides:
+#'
+#' * A residual plot.
+#'
+#' * Posterior draws of model parameters.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -435,39 +474,35 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 #' library(dplyr)
 #'
 #' df <- df2 %>%
-#' mutate(arrivalTime = as.numeric(.data$randdt - trialsdt + 1))
+#' mutate(arrivalTime = as.numeric(randdt - trialsdt + 1))
 #'
 #' vf <- visitview2 %>%
 #'   inner_join(df, by = "usubjid") %>%
 #'   mutate(day = as.numeric(date - randdt + 1)) %>%
-#'   select(drug, drug_name, dose_unit,
-#'          usubjid, treatment,
+#'   select(drug, drug_name, dose_unit, usubjid, treatment,
 #'          treatment_description, arrivalTime,
-#'          time, event, dropout,
-#'          day, dispensed_quantity) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid, treatment,
+#'          time, event, dropout, day, dispensed_quantity) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid, treatment,
 #'            treatment_description, arrivalTime,
-#'            time, event, dropout,
-#'            day) %>%
+#'            time, event, dropout, day) %>%
 #'   summarise(dose = sum(dispensed_quantity),
 #'             .groups = "drop_last") %>%
 #'   mutate(cum_dose = cumsum(dose)) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid) %>%
 #'   mutate(row_id = row_number())
 #'
-#' delta = dosing_schedule_df$target_days[1]
+#' vf <- vf %>%
+#'   left_join(dosing_schedule_df, by = "drug")
 #'
 #' # time from randomization to the first drug dispensing visit
 #' df_k0 <- vf %>%
 #'   filter(row_id == 1) %>%
 #'   mutate(time = day,
-#'          skipped = floor((time - delta/2)/delta) + 1)
+#'          skipped = floor((time - target_days/2)/target_days) + 1)
 #'
 #' df_t1 <- df_k0 %>%
-#'   dplyr::filter(.data$skipped > 0) %>%
-#'   dplyr::mutate(k1 = .data$skipped)
+#'   filter(skipped > 0) %>%
+#'   mutate(k1 = skipped)
 #'
 #' fit_t1 <- f_fit_ti(df_t1, model = "lm", nreps = 200)
 #'
@@ -506,25 +541,42 @@ f_fit_ti <- function(df, model = "lm", nreps, showplot = TRUE) {
 }
 
 
-#' @title Linear Mixed Effects Model for Dispensed Doses
-#' @description Fits a linear mixed effects model to the dispensed doses.
+#' @title Linear Mixed-Effects Model Fit for Dispensed Doses
+#' @description Fits a linear mixed-effects model to the dispensed doses.
 #'
-#' @param df The subject-level event data, including \code{usubjid}
-#'   and \code{dose}.
-#' @param model The model for the dispensed doses, which can be one of
-#'   the following options: "constant", "lm", and "lme".
-#' @param nreps The number of simulations for posterior draw of model
+#' @param df The subject-level dosing data, including \code{usubjid},
+#'   \code{day}, \code{drug}, and \code{dose}.
+#' @param model The model used to analyze the dispensed doses, with
+#'   options including "constant", "lm" (linear model), and
+#'   "lme" (linear mixed-effects model).
+#' @param nreps The number of simulations for drawing posterior model
 #'   parameters.
-#' @param showplot A Boolean variable to control whether or not to
-#'   show the residual plot. By default, it is set to \code{TRUE}.
+#' @param showplot A Boolean variable that controls whether or not to
+#'   show the residual plot. It defaults to \code{TRUE}.
 #'
-#' @return A list of results from the model fit including
-#' \code{model}, \code{mud}, \code{vmud}, \code{sigmab}, \code{sigmae},
-#' as well as the Akaike Information Criterion, \code{aic}, and
-#' Bayesian Information Criterion, \code{bic}.
+#' @return A list of results from the model fit, including
 #'
-#' The residual plot and the posterior draw of model parameters and
-#' subject random effects are also provided.
+#' * \code{model}: The specific model used in the analysis.
+#'
+#' * \code{mud}: The estimated mean dose.
+#'
+#' * \code{vmud}: The estimated variance of \code{mud}.
+#'
+#' * \code{sigmab}: The estimated between-subject standard deviation.
+#'
+#' * \code{sigmae}: The estimated within-subject residual standard deviation.
+#'
+#' * \code{aic}: The Akaike Information Criterion value for the model fit.
+#'
+#' * \code{bic}: The Bayesian Information Criterion value for the model fit.
+#'
+#' Additionaly, the function provies:
+#'
+#' * A residual plot.
+#'
+#' * Posterior draws of model parameters.
+#'
+#' * Subject random effects.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -532,26 +584,21 @@ f_fit_ti <- function(df, model = "lm", nreps, showplot = TRUE) {
 #' library(dplyr)
 #'
 #' df <- df2 %>%
-#'   mutate(arrivalTime = as.numeric(.data$randdt - trialsdt + 1))
+#'   mutate(arrivalTime = as.numeric(randdt - trialsdt + 1))
 #'
 #' vf <- visitview2 %>%
 #'   inner_join(df, by = "usubjid") %>%
 #'   mutate(day = as.numeric(date - randdt + 1)) %>%
-#'   select(drug, drug_name, dose_unit,
-#'          usubjid, treatment,
+#'   select(drug, drug_name, dose_unit, usubjid, treatment,
 #'          treatment_description, arrivalTime,
-#'          time, event, dropout,
-#'          day, dispensed_quantity) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid, treatment,
+#'          time, event, dropout, day, dispensed_quantity) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid, treatment,
 #'            treatment_description, arrivalTime,
-#'            time, event, dropout,
-#'            day) %>%
+#'            time, event, dropout, day) %>%
 #'   summarise(dose = sum(dispensed_quantity),
 #'             .groups = "drop_last") %>%
 #'   mutate(cum_dose = cumsum(dose)) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid) %>%
 #'   mutate(row_id = row_number())
 #'
 #' vf1 <- vf %>% filter(drug == 3)
@@ -613,8 +660,8 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
                   vmud = as.numeric(vcov(a)),
                   sigmab = as.numeric(exp(attr(a$apVar, "Pars")))[1],
                   sigmae = as.numeric(exp(attr(a$apVar, "Pars")))[2],
-                  aic = as.numeric(-2*logLik(a) + 6),
-                  bic = as.numeric(-2*logLik(a) + 3*log(n)))
+                  aic = as.numeric(AIC(a)),
+                  bic = as.numeric(BIC(a)))
 
       gf <- dplyr::tibble(x = as.numeric(a$fitted[,"usubjid"]),
                           y = as.numeric(a$residuals[,"usubjid"]))
@@ -627,26 +674,18 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
       d <- (df %>% dplyr::summarise(d = mean(.data$dose),
                                     .groups = "drop_last"))$d
 
-      # draw the variance parameters
-      sigma_b_e = exp(mvtnorm::rmvnorm(
-        nreps, mean = as.numeric(attr(a$apVar, "Pars")), sigma = a$apVar))
-      sigma_b = sigma_b_e[,1]
-      sigma_e = sigma_b_e[,2]
+      # fix the variance parameters to avoid drawing too extreme values
+      # of sigma_b due to the large variance of log(sigma_b), i.e.
+      # the variance component is likely to be zero
+      sigma_b = rep(fit$sigmab, nreps)
+      sigma_e = rep(fit$sigmae, nreps)
       sigma_b2 = sigma_b^2
       sigma_e2 = sigma_e^2
 
-      # draw mud given sigmab and sigmae
-      s1 = 0
-      s2 = 0
-      for (i in 1:N) {
-        s1 = s1 + d[i]/(sigma_e2/m[i] + sigma_b2)
-        s2 = s2 + 1/(sigma_e2/m[i] + sigma_b2)
-      }
-
-      mud = s1/s2 + sqrt(1/s2)*rnorm(nreps)
+      mud = fit$mud + sqrt(fit$vmud)*rnorm(nreps)
 
       # fixed effects model parameters
-      theta_fix = matrix(c(mud, sigma_b_e), nreps, 3)
+      theta_fix = matrix(c(mud, sigma_b, sigma_e), nreps, 3)
 
       # random effects model parameters
       theta_ran = matrix(0, nreps, N)
@@ -682,34 +721,40 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
 #' @description Fits drug dispensing models to the observed drug
 #' dispensing data.
 #'
-#' @param target_days The vector of target number of gap days between two
+#' @param target_days A vector of target number of days between two
 #'   drug dispensing visits by drug.
-#' @param vf The observed subject/visit level drug dispensing data.
+#' @param vf A data frame for subject-level drug dispensing data,
+#'   including the following variables:
+#'   \code{drug}, \code{drug_name}, \code{dose_unit},
+#'   \code{usubjid}, \code{treatment}, \code{treatment_description},
+#'   \code{arrivalTime}, \code{time}, \code{event}, \code{dropout},
+#'   \code{day}, \code{dose}, \code{cum_dose}, and \code{row_id}.
 #' @param model_k0 The model for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
 #' @param model_t0 The model for the gap time between randomization
-#'   and the first drug dispensing visit without skipping.
+#'   and the first drug dispensing visit when there is no visit skipping.
 #' @param model_ki The model for the number of skipped
 #'   visits between two consecutive drug dispensing visits.
 #' @param model_di The model for the dispensed doses at drug
 #'   dispensing visits.
-#' @param nreps The number of replications for simulation.
-#' @param showplot A Boolean variable to control whether or not to
-#'   show the model fit plot. By default, it is set to \code{TRUE}.
+#' @param nreps The number of simulations for drawing posterior model
+#'   parameters.
+#' @param showplot A Boolean variable that controls whether or not to
+#'   show the model fit plot. It defaults to \code{TRUE}.
 #'
-#' @return A list of the following components:
+#' @return A list with the following components:
 #'
-#' * \code{common_time_model} A Boolean variable to indicate whether
-#' a common time model is used for drug dispensing visit timing.
+#' * \code{common_time_model} A Boolean variable that indicates whether
+#' a common time model is used for drug dispensing visits.
 #'
 #' * \code{fit_k0} The model fit for the number of skipped
 #' visits between randomization and the first drug dispensing visit.
 #'
 #' * \code{fit_t0} The model fit for the gap time between randomization
-#' and the first drug dispensing visit with no skipping.
+#' and the first drug dispensing visit when there is no visit skipping.
 #'
 #' * \code{fit_t1} The model fit for the gap time between randomization
-#' and the first drug dispensing visit with skipping.
+#' and the first drug dispensing visit when there is visit skipping.
 #'
 #' * \code{fit_ki} The model fit for the number of skipped
 #' visits between two consecutive drug dispensing visits.
@@ -726,26 +771,21 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
 #' library(dplyr)
 #'
 #' df <- df2 %>%
-#'   mutate(arrivalTime = as.numeric(.data$randdt - trialsdt + 1))
+#'   mutate(arrivalTime = as.numeric(randdt - trialsdt + 1))
 #'
 #' vf <- visitview2 %>%
 #'   inner_join(df, by = "usubjid") %>%
 #'   mutate(day = as.numeric(date - randdt + 1)) %>%
-#'   select(drug, drug_name, dose_unit,
-#'          usubjid, treatment,
+#'   select(drug, drug_name, dose_unit, usubjid, treatment,
 #'          treatment_description, arrivalTime,
-#'          time, event, dropout,
-#'          day, dispensed_quantity) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid, treatment,
+#'          time, event, dropout, day, dispensed_quantity) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid, treatment,
 #'            treatment_description, arrivalTime,
-#'            time, event, dropout,
-#'            day) %>%
+#'            time, event, dropout, day) %>%
 #'   summarise(dose = sum(dispensed_quantity),
 #'             .groups = "drop_last") %>%
 #'   mutate(cum_dose = cumsum(dose)) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid) %>%
 #'   mutate(row_id = row_number())
 #'
 #' fit <- f_dispensing_models(
