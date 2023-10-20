@@ -2,20 +2,59 @@
 #' @aliases drugDemand-package
 #' @docType package
 #'
-#' @title Drug Demand Forecast
+#' @title Drug Demand Forecasting
 #'
-#' @description Performs drug demand forecast by modeling drug
-#' dispensing data along with predicted enrollment and
-#' treatment discontinuation dates.
+#' @description Performs drug demand forecasting by modeling drug
+#' dispensing data while taking into account predicted enrollment
+#' and treatment discontinuation dates.
 #'
-#' @details In clinical trials, patients do not always follow the
+#' @details In clinical trials, patients do not always follow
 #' protocol-specified visit and drug dispensing schedules.
-#' Patients may be late to the drug dispensing visit.
-#' Patients may skip drug dispensing visits.
-#' Patients may be dispensed doses different from the target dose.
-#' Predictions based solely on protocols will likely overestimate
-#' the drug demand. Therefore, we propose to model the observed
-#' drug dispensing data to account for the various deviations.
+#' Patients may encounter delays in there drug dispensing
+#' appointments, skip visits altogether, or receive doses
+#' different from the protocol-specified target.
+#' Relying solely on protocol-based predictions tends to result
+#' in an overestimation of drug demand. Consequently, we propose
+#' a method that models observed drug dispensing data,
+#' thereby accounting for these deviations.
+#'
+#' * \code{k0} The number of skipped visits between randomization
+#' and the first drug dispensing visit.
+#'
+#' * \code{t0} The time elapsed between randomization and the first
+#' drug dispensing visit when k0 equals 0.
+#'
+#' * \code{t1} The time elapsed between randomization and the first
+#' drug dispensing visit when k0 is greater than 0.
+#'
+#' * \code{ki} The number of skipped visits between two consecutive
+#' drug dispensing visits.
+#'
+#' * \code{ti} The time elapsed between two consecutive drug
+#' dispensing visits.
+#'
+#' * \code{di} The number of kits dispensed at drug dispensing visits.
+#'
+#' For \code{k0} and \code{ki}, we explore several modeling options,
+#' including constant, Poisson, zero-inflated Poisson (ZIP), and
+#' zero-inflated negative binomial (ZINB) distributions.
+#'
+#' For \code{t0}, we consider various models such as constant,
+#' exponential, Weibull, log-logistic, and log-normal.
+#'
+#' Linear regression models are applied to \code{t1} (given \code{k0})
+#' and \code{ti} (given \code{ki}).
+#'
+#' For \code{di}, we evaluate constant, linear, and linear
+#' mixed-effects models with subject random effects.
+#'
+#' Once the dosing models are fitted to the observed drug
+#' dispensing data, we draw model parameters from their
+#' approximate posterior distributions. Subsequently, we simulate
+#' drug dispensing data after cutoff for both ongoing and new patients.
+#'
+#' Finally, we estimate the number of kits to dispense based on the
+#' simulated data.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
