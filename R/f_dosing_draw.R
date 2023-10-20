@@ -1,26 +1,143 @@
-#' @title Drug Dispensing Visits for One Iteration
-#' @description Obtains drug dispensing visits for one iteration.
+#' @title Drug Dispensing Visit Dates for One Iteration
+#' @description Obtains drug dispensing visit dates for one iteration.
 #'
 #' @param i The iteration number.
 #' @param fit_k0 The model fit for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
 #' @param fit_t0 The model fit for the gap time between randomization
-#'   and the first drug dispensing visit with no skipping.
+#'   and the first drug dispensing visit when there is no visit skipping.
 #' @param fit_t1 The model fit for the gap time between randomization
-#'   and the first drug dispensing visit with skipping.
+#'   and the first drug dispensing visit when there is visit skipping.
 #' @param fit_ki The model fit for the number of skipped
 #'   visits between two consecutive drug dispensing visits.
 #' @param fit_ti The model fit for the gap time between two
 #'   consecutive drug dispensing visits.
-#' @param vf_ongoing1 The last drug dispensing date for ongoing patients.
+#' @param vf_ongoing1 The last observed drug dispensing date for
+#'   ongoing patients, with or without the associated drug information.
 #' @param vf_new1 The randomization date for new patients and ongoing
-#'   patients with no drug dispensing records.
+#'   patients with no drug dispensing records, with or without the
+#'   associated drug information.
 #'
 #' @return Drug dispensing visit dates at the subject level.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
-#' @keywords internal
+#' @examples
+#'
+#' \dontrun{
+#' set.seed(431)
+#' library(dplyr)
+#'
+#' df <- df2 %>%
+#'   mutate(arrivalTime = as.numeric(randdt - trialsdt + 1))
+#'
+#' vf <- visitview2 %>%
+#'   inner_join(df, by = "usubjid") %>%
+#'   mutate(day = as.numeric(date - randdt + 1)) %>%
+#'   select(drug, drug_name, dose_unit, usubjid, treatment,
+#'          treatment_description, arrivalTime,
+#'          time, event, dropout, day, dispensed_quantity) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid, treatment,
+#'            treatment_description, arrivalTime,
+#'            time, event, dropout, day) %>%
+#'   summarise(dose = sum(dispensed_quantity),
+#'             .groups = "drop_last") %>%
+#'   mutate(cum_dose = cumsum(dose)) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid) %>%
+#'   mutate(row_id = row_number())
+#'
+#' pred <- eventPred::getPrediction(
+#'   df = df,
+#'   to_predict = "event only",
+#'   target_d = 250,
+#'   event_model = "log-logistic",
+#'   dropout_model = "none",
+#'   pilevel = 0.95,
+#'   nyears = 3,
+#'   nreps = 200,
+#'   showsummary = FALSE,
+#'   showplot = FALSE,
+#'   by_treatment = TRUE)
+#' newEvents <- pred$event_pred$newEvents
+#'
+#' drug_name = drug_description_df$drug_name
+#' dose_unit = drug_description_df$dose_unit
+#' treatment_by_drug_df <- f_treatment_by_drug_df(
+#'   treatment_by_drug, drug_name, dose_unit)
+#'
+#' fit <- f_dispensing_models(
+#'   target_days = dosing_schedule_df$target_days, vf,
+#'   model_k0 = "zip", model_t0 = "log-logistic",
+#'   model_ki = "zip", model_di = "lme",
+#'   nreps = 200, showplot = FALSE)
+#'
+#' trialsdt = df$trialsdt[1]
+#' cutoffdt = df$cutoffdt[1]
+#' t0 = as.numeric(cutoffdt - trialsdt + 1)
+#' nyears = 3
+#' t1 = t0 + nyears*365
+#' t = c(seq(t0, t1, 30), t1)
+#'
+#' nreps = length(unique(newEvents$draw))
+#' l = length(unique(treatment_by_drug_df$drug))
+#'
+#' # all ongoing subjects
+#' df_unames1 <- df %>% filter(event == 0)
+#' unames1 <- df_unames1$usubjid
+#'
+#' # ongoing subjects with dosing records
+#' df_unames2 <- vf %>% filter(event == 0) %>%
+#'   group_by(usubjid) %>% slice(n())
+#' unames2 <- df_unames2$usubjid
+#'
+#' ### dosing data for ongoing patients ###
+#' vf1 <- vf %>%
+#'   filter(usubjid %in% unames2) %>%
+#'   select(drug, drug_name, dose_unit, usubjid, day, dose)
+#'
+#' # replicate for nreps times
+#' vf1_rep = tibble(draw = 1:nreps) %>% cross_join(vf1)
+#'
+#' df1 <- newEvents %>%
+#'   filter(usubjid %in% unames1) %>% select(-c(event, dropout))
+#'
+#' vf_ongoing <- vf1_rep %>%
+#'   inner_join(df1, by = c("draw", "usubjid"))
+#'
+#' ### new patients and ongoing patients with no dosing records ###
+#' df_new <- newEvents %>%
+#'   filter(arrivalTime > t0 | usubjid %in% setdiff(unames1, unames2))
+#'
+#' vf_new <- purrr::map_dfr(
+#'   1:l, function(h) {
+#'     df_new %>%
+#'       inner_join(treatment_by_drug_df %>% filter(drug == h),
+#'                  by = "treatment") %>%
+#'       select(-c(event, dropout))
+#'   })
+#'
+#' # only keep the last record for each patient in each draw
+#' vf_ongoing1 <- vf_ongoing %>%
+#'   group_by(draw, usubjid) %>% slice(n()) %>%
+#'   mutate(V = day - 1,
+#'          C = as.numeric(t0 - arrivalTime),
+#'          D = pmin(time - 1, t1 - arrivalTime)) %>%
+#'   select(-c(drug, drug_name, dose_unit, day, dose))
+#'
+#' ### new patients and ongoing patients with no dosing records ###
+#' vf_new1 <- vf_new %>%
+#'   group_by(draw, usubjid) %>% slice(n()) %>%
+#'   mutate(V = 0,
+#'          C = as.numeric(t0 - arrivalTime),
+#'          D = pmin(time - 1, t1 - arrivalTime)) %>%
+#'   select(-c(drug, drug_name, dose_unit))
+#'
+#' dosing_subject_new1 <- f_dosing_draw_t_1(
+#'   1, fit$fit_k0, fit$fit_t0, fit$fit_t1,
+#'   fit$fit_ki, fit$fit_ti, vf_ongoing1, vf_new1)
+#'
+#' head(dosing_subject_new1)
+#' }
 #'
 #' @export
 f_dosing_draw_t_1 <- function(
@@ -134,14 +251,14 @@ f_dosing_draw_t_1 <- function(
 #' @description Obtains drug dispensing data for one iteration.
 #'
 #' @param i The iteration number.
-#' @param common_time_model A Boolean variable to indicate whether
-#'   a common time model is used for drug dispensing visit timing.
+#' @param common_time_model A Boolean variable that indicates whether
+#'   a common time model is used for drug dispensing visits.
 #' @param fit_k0 The model fit for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
 #' @param fit_t0 The model fit for the gap time between randomization
-#'   and the first drug dispensing visit with no skipping.
+#'   and the first drug dispensing visit when there is no visit skipping.
 #' @param fit_t1 The model fit for the gap time between randomization
-#'   and the first drug dispensing visit with skipping.
+#'   and the first drug dispensing visit when there is visit skipping.
 #' @param fit_ki The model fit for the number of skipped
 #'   visits between two consecutive drug dispensing visits.
 #' @param fit_ti The model fit for the gap time between two
@@ -157,9 +274,11 @@ f_dosing_draw_t_1 <- function(
 #' @param vf_new1 The randomization date for new patients and ongoing
 #'   patients with no drug dispensing records, with or without the
 #'   associated drug information.
-#' @param treatment_by_drug_df The data frame that indicates the
-#'   treatment(s) associated with each drug.
-#' @param t The vector of new time points for drug dispensing prediction.
+#' @param treatment_by_drug_df A data frame indicating the treatments
+#'   associated with each drug, including the following variables:
+#'   \code{treatment}, \code{drug}, \code{drug_name}, and
+#'   \code{dose_unit}.
+#' @param t A vector of new time points for drug dispensing predictions.
 #'
 #' @return A list of two components:
 #'
@@ -167,11 +286,131 @@ f_dosing_draw_t_1 <- function(
 #'   subject level by date for the given iteration.
 #'
 #' * \code{dosing_summary_newi} for the drug dispensing summary data
-#'   by drug, t, and draw for the given iteration.
+#'   by drug, time, and simulation draw for the given iteration.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
-#' @keywords internal
+#' @examples
+#'
+#' \dontrun{
+#' set.seed(431)
+#' library(dplyr)
+#'
+#' df <- df2 %>%
+#'   mutate(arrivalTime = as.numeric(randdt - trialsdt + 1))
+#'
+#' vf <- visitview2 %>%
+#'   inner_join(df, by = "usubjid") %>%
+#'   mutate(day = as.numeric(date - randdt + 1)) %>%
+#'   select(drug, drug_name, dose_unit, usubjid, treatment,
+#'          treatment_description, arrivalTime,
+#'          time, event, dropout, day, dispensed_quantity) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid, treatment,
+#'            treatment_description, arrivalTime,
+#'            time, event, dropout, day) %>%
+#'   summarise(dose = sum(dispensed_quantity),
+#'             .groups = "drop_last") %>%
+#'   mutate(cum_dose = cumsum(dose)) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid) %>%
+#'   mutate(row_id = row_number())
+#'
+#' pred <- eventPred::getPrediction(
+#'   df = df,
+#'   to_predict = "event only",
+#'   target_d = 250,
+#'   event_model = "log-logistic",
+#'   dropout_model = "none",
+#'   pilevel = 0.95,
+#'   nyears = 3,
+#'   nreps = 200,
+#'   showsummary = FALSE,
+#'   showplot = FALSE,
+#'   by_treatment = TRUE)
+#' newEvents <- pred$event_pred$newEvents
+#'
+#' drug_name = drug_description_df$drug_name
+#' dose_unit = drug_description_df$dose_unit
+#' treatment_by_drug_df <- f_treatment_by_drug_df(
+#'   treatment_by_drug, drug_name, dose_unit)
+#'
+#' fit <- f_dispensing_models(
+#'   target_days = dosing_schedule_df$target_days, vf,
+#'   model_k0 = "zip", model_t0 = "log-logistic",
+#'   model_ki = "zip", model_di = "lme",
+#'   nreps = 200, showplot = FALSE)
+#'
+#' trialsdt = df$trialsdt[1]
+#' cutoffdt = df$cutoffdt[1]
+#' t0 = as.numeric(cutoffdt - trialsdt + 1)
+#' nyears = 3
+#' t1 = t0 + nyears*365
+#' t = c(seq(t0, t1, 30), t1)
+#'
+#' nreps = length(unique(newEvents$draw))
+#' l = length(unique(treatment_by_drug_df$drug))
+#'
+#' # all ongoing subjects
+#' df_unames1 <- df %>% filter(event == 0)
+#' unames1 <- df_unames1$usubjid
+#'
+#' # ongoing subjects with dosing records
+#' df_unames2 <- vf %>% filter(event == 0) %>%
+#'   group_by(usubjid) %>% slice(n())
+#' unames2 <- df_unames2$usubjid
+#'
+#' ### dosing data for ongoing patients ###
+#' vf1 <- vf %>%
+#'   filter(usubjid %in% unames2) %>%
+#'   select(drug, drug_name, dose_unit, usubjid, day, dose)
+#'
+#' # replicate for nreps times
+#' vf1_rep = tibble(draw = 1:nreps) %>% cross_join(vf1)
+#'
+#' df1 <- newEvents %>%
+#'   filter(usubjid %in% unames1) %>% select(-c(event, dropout))
+#'
+#' vf_ongoing <- vf1_rep %>%
+#'   inner_join(df1, by = c("draw", "usubjid"))
+#'
+#' ### new patients and ongoing patients with no dosing records ###
+#' df_new <- newEvents %>%
+#'   filter(arrivalTime > t0 | usubjid %in% setdiff(unames1, unames2))
+#'
+#' vf_new <- purrr::map_dfr(
+#'   1:l, function(h) {
+#'     df_new %>%
+#'       inner_join(treatment_by_drug_df %>% filter(drug == h),
+#'                  by = "treatment") %>%
+#'       select(-c(event, dropout))
+#'   })
+#'
+#' # only keep the last record for each patient in each draw
+#' vf_ongoing1 <- vf_ongoing %>%
+#'   group_by(draw, usubjid) %>% slice(n()) %>%
+#'   mutate(V = day - 1,
+#'          C = as.numeric(t0 - arrivalTime),
+#'          D = pmin(time - 1, t1 - arrivalTime)) %>%
+#'   select(-c(drug, drug_name, dose_unit, day, dose))
+#'
+#' ### new patients and ongoing patients with no dosing records ###
+#' vf_new1 <- vf_new %>%
+#'   group_by(draw, usubjid) %>% slice(n()) %>%
+#'   mutate(V = 0,
+#'          C = as.numeric(t0 - arrivalTime),
+#'          D = pmin(time - 1, t1 - arrivalTime)) %>%
+#'   select(-c(drug, drug_name, dose_unit))
+#'
+#' # first iteration to extract subject and summary data
+#' list1 <- f_dosing_draw_1(
+#'   1, fit$common_time_model,
+#'   fit$fit_k0, fit$fit_t0, fit$fit_t1,
+#'   fit$fit_ki, fit$fit_ti, fit$fit_di,
+#'   vf_ongoing, vf_new, vf_ongoing1, vf_new1,
+#'   treatment_by_drug_df, t)
+#'
+#' head(list1$dosing_subject_newi)
+#' head(list1$dosing_summary_newi)
+#' }
 #'
 #' @export
 f_dosing_draw_1 <- function(
@@ -276,38 +515,40 @@ f_dosing_draw_1 <- function(
 
 
 
-#' @title Drug Dispensing Data Modeling and Simulation
-#' @description Fits drug dispensing models to the observed drug
-#' dispensing data and simulates new drug dispensing records.
+#' @title Drug Dispensing Data Simulation
+#' @description Simulates drug dispensing data after cutoff for
+#' both ongoing and new patients.
 #'
-#' @param df The subject level enrollment and event data.
-#'   It should contain the following variables:
+#' @param df A data frame for subject-level enrollment and event data,
+#'   including the following variables:
 #'   \code{trialsdt}, \code{usubjid}, \code{randdt},
 #'   \code{treatment}, \code{treatment_description},
 #'   \code{time}, \code{event}, \code{dropout}, and \code{cutoffdt}.
-#' @param vf The observed subject drug dispensing data. It should
-#'   contain the following variables:
+#' @param vf A data frame for subject-level drug dispensing data,
+#'   including the following variables:
 #'   \code{drug}, \code{drug_name}, \code{dose_unit},
 #'   \code{usubjid}, \code{treatment}, \code{treatment_description},
 #'   \code{arrivalTime}, \code{time}, \code{event}, \code{dropout},
 #'   \code{day}, \code{dose}, \code{cum_dose}, and \code{row_id}.
-#' @param newEvents The predicted enrollment and event data for
-#'   ongoing and new patients. It should contain the following variables:
+#' @param newEvents A data frame containing the imputed event data
+#'   for both ongoing and new patients, typically obtained from
+#'   the output of the \code{eventPred::getPrediction} function.
+#'   It contains the following variables:
 #'   \code{draw}, \code{usubjid}, \code{arrivalTime}, \code{treatment},
 #'   \code{treatment_description}, \code{time}, \code{event},
 #'   \code{dropout}, and \code{totalTime}.
-#' @param treatment_by_drug_df The data frame that indicates the
-#'   treatment(s) associated with each drug. It should contain the
-#'   following variables: \code{treatment}, \code{drug},
-#'   \code{drug_name}, and \code{dose_unit}.
-#' @param common_time_model A Boolean variable to indicate whether
-#'   a common time model is used for drug dispensing visit timing.
+#' @param treatment_by_drug_df A data frame indicating the treatments
+#'   associated with each drug, including the following variables:
+#'   \code{treatment}, \code{drug}, \code{drug_name}, and
+#'   \code{dose_unit}.
+#' @param common_time_model A Boolean variable that indicates whether
+#'   a common time model is used for drug dispensing visits.
 #' @param fit_k0 The model fit for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
 #' @param fit_t0 The model fit for the gap time between randomization
-#'   and the first drug dispensing visit with no skipping.
+#'   and the first drug dispensing visit when there is no visit skipping.
 #' @param fit_t1 The model fit for the gap time between randomization
-#'   and the first drug dispensing visit with skipping.
+#'   and the first drug dispensing visit when there is visit skipping.
 #' @param fit_ki The model fit for the number of skipped
 #'   visits between two consecutive drug dispensing visits.
 #' @param fit_ti The model fit for the gap time between two
@@ -315,19 +556,19 @@ f_dosing_draw_1 <- function(
 #' @param fit_di The model fit for the dispensed doses at drug
 #'   dispensing visits.
 #' @param t0 The cutoff date relative to the trial start date.
-#' @param t The vector of new time points for drug dispensing prediction.
+#' @param t A vector of new time points for drug dispensing predictions.
 #'
-#' @return A list of the following components:
+#' @return A list with two components:
 #'
-#' * \code{dosing_subject_new} The data frame form the observed and
-#' imputed subject level dosing records for ongoing and new patients.
+#' * \code{dosing_subject_new} A data frame containing observed and
+#' imputed subject-level dosing records for ongoing and new patients.
 #' It contains the following variables:
 #' \code{draw}, \code{drug}, \code{drug_name}, \code{dose_unit},
 #' \code{usubjid}, \code{day}, \code{dose}, \code{arrivalTime},
 #' \code{treatment}, \code{treatment_description}, \code{time},
 #' and \code{totalTime}.
 #'
-#' * \code{dosing_summary_new} The data frame for dosing summary
+#' * \code{dosing_summary_new} A data frame providing dosing summaries
 #' by drug, future time point, and simulation draw for ongoing
 #' and new patients. It contains the following variables:
 #' \code{drug}, \code{drug_name}, \code{dose_unit}, \code{t},
@@ -347,29 +588,17 @@ f_dosing_draw_1 <- function(
 #' vf <- visitview2 %>%
 #'   inner_join(df, by = "usubjid") %>%
 #'   mutate(day = as.numeric(date - randdt + 1)) %>%
-#'   select(drug, drug_name, dose_unit,
-#'          usubjid, treatment,
+#'   select(drug, drug_name, dose_unit, usubjid, treatment,
 #'          treatment_description, arrivalTime,
-#'          time, event, dropout,
-#'          day, dispensed_quantity) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid, treatment,
+#'          time, event, dropout, day, dispensed_quantity) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid, treatment,
 #'            treatment_description, arrivalTime,
-#'            time, event, dropout,
-#'            day) %>%
+#'            time, event, dropout, day) %>%
 #'   summarise(dose = sum(dispensed_quantity),
 #'             .groups = "drop_last") %>%
 #'   mutate(cum_dose = cumsum(dose)) %>%
-#'   group_by(drug, drug_name, dose_unit,
-#'            usubjid) %>%
+#'   group_by(drug, drug_name, dose_unit, usubjid) %>%
 #'   mutate(row_id = row_number())
-#'
-#'
-#' fit <- f_dispensing_models(
-#'   target_days = dosing_schedule_df$target_days, vf,
-#'   model_k0 = "zip", model_t0 = "log-logistic",
-#'   model_ki = "zip", model_di = "lme",
-#'   nreps = 200, showplot = FALSE)
 #'
 #' pred <- eventPred::getPrediction(
 #'   df = df,
@@ -383,8 +612,18 @@ f_dosing_draw_1 <- function(
 #'   showsummary = FALSE,
 #'   showplot = FALSE,
 #'   by_treatment = TRUE)
-#'
 #' newEvents <- pred$event_pred$newEvents
+#'
+#' drug_name = drug_description_df$drug_name
+#' dose_unit = drug_description_df$dose_unit
+#' treatment_by_drug_df <- f_treatment_by_drug_df(
+#'   treatment_by_drug, drug_name, dose_unit)
+#'
+#' fit <- f_dispensing_models(
+#'   target_days = dosing_schedule_df$target_days, vf,
+#'   model_k0 = "zip", model_t0 = "log-logistic",
+#'   model_ki = "zip", model_di = "lme",
+#'   nreps = 200, showplot = FALSE)
 #'
 #' trialsdt = df$trialsdt[1]
 #' cutoffdt = df$cutoffdt[1]
@@ -400,9 +639,7 @@ f_dosing_draw_1 <- function(
 #'   fit$fit_ki, fit$fit_ti, fit$fit_di, t0, t)
 #'
 #' head(a$dosing_subject_new)
-#'
 #' head(a$dosing_summary_new)
-#'
 #' }
 #'
 #' @export
@@ -516,7 +753,7 @@ f_dosing_draw <- function(
 
 
   # register parallel backend
-  n.cores <- parallel::detectCores()/2
+  n.cores <- min(parallel::detectCores()/2, 10)
   cl <- parallel::makeCluster(n.cores)
   doParallel::registerDoParallel(cl)
 
