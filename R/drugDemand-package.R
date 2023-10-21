@@ -6,12 +6,19 @@
 #'
 #' @description Performs drug demand forecasting by modeling drug
 #' dispensing data while taking into account predicted enrollment
-#' and treatment discontinuation dates. The number of skipped
-#' visits and the number of dispensed doses are modeled using
-#' zero-inflated Poisson or zero-inflated negative binomial distributions
-#' (Zeileis, Kleiber & Jackman (2008) <doi:10.18637/jss.v027.i08>)
-#' and a linear mixed-effects model
-#' (McCulloch & Searle (2001, ISBN:0-471-19364-X)), respectively.
+#' and treatment discontinuation dates. The gap time between
+#' randomization and the first drug dispensing visit is modeled
+#' using interval-censored exponential, Weibull, log-logistic, or
+#' log-normal distributions
+#' (Anderson-Bergman (2017) <doi:10.18637/jss.v081.i12>).
+#' The number of skipped visits is modeled using zero-inflated
+#' Poisson or zero-inflated negative binomial distributions
+#' (Zeileis, Kleiber & Jackman (2008) <doi:10.18637/jss.v027.i08>).
+#' The gap time between two consecutive drug dispensing visis
+#' is modeled using linear regression given the number of skipped
+#' visits. The number of dispensed doses is modeled using a linear
+#' mixed-effects model
+#' (McCulloch & Searle (2001, ISBN:0-471-19364-X)).
 #'
 #' @details In clinical trials, patients do not always follow
 #' protocol-specified visit and drug dispensing schedules.
@@ -64,6 +71,11 @@
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
 #' @references
+#'
+#' Clifford Anderson-Bergman.
+#' icenReg: Regression Models for Interval Censored Data in R.
+#' J Stat Softw. 2017, Volume 81, Issue 12.
+#'
 #' Achim Zeileis, Christian Kleiber, and Simon Jackman.
 #' Regression models for count data in R.
 #' J Stat Softw. 2008, Volume 27, Issue 8.
@@ -89,8 +101,8 @@
 #' @importFrom doRNG %dorng%
 #' @importFrom survival Surv survfit
 #' @importFrom stats AIC BIC dnbinom dpois glm lm logLik optimHess
-#'   pexp plogis pnorm poisson pweibull quantile rchisq rnorm
-#'   rstandard var vcov
+#'   pexp plogis plnorm pnorm poisson pweibull quantile rchisq
+#'   rnorm rstandard var vcov
 #' @importFrom erify check_bool check_class check_content check_n
 #' @importFrom rlang .data
 #' @importFrom purrr map_dfr
