@@ -6,8 +6,8 @@
 #' @param df The subject-level dosing data, including the following
 #'   variables:
 #'
-#'   * \code{time}: The number of days between randomization to the
-#'   first drug dispensing visit (first drug dispensing date -
+#'   * \code{time}: The number of days between randomization and the
+#'   first drug dispensing visit (first drug dispensing visit date -
 #'   randomization date + 1).
 #'
 #'   * \code{status}: The event indicator which equals 1.
@@ -104,6 +104,7 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
   p.obs = rep(0, ymax)
   p.obs[y.obs] = -diff(c(1, s_t0_a$surv))
 
+  # fit time-to-event models
   l = length(unique(df$time))
   if (l == 1) {
     fit <- list(model = "constant",
@@ -179,9 +180,11 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 
       mu = fit$theta[1]
       sigma = exp(fit$theta[2])
-      p.fit = pnorm(log(y), mu, sigma) - pnorm(log(y-1), mu, sigma)
+      p.fit = plnorm(y, mu, sigma) - plnorm(y-1, mu, sigma)
 
       post = mvtnorm::rmvnorm(nreps, mean = fit$theta, sigma = fit$vtheta)
+    } else {
+      stop("incorrect model for T0")
     }
   }
 
@@ -198,7 +201,7 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
                            name = 'Observed')
     fig <- fig %>% plotly::add_trace(y = ~p.fit, name = 'Fitted')
     fig <- fig %>% plotly::layout(
-      xaxis = list(title = 'Day for first drug dispensing visit'),
+      xaxis = list(title = 'Day for the first drug dispensing visit'),
       yaxis = list(title = 'Proportion'),
       barmode = 'group')
 
@@ -306,6 +309,7 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
   p.obs = rep(0, ymax+1)
   p.obs[y.obs+1] = count/sum(count)
 
+  # fit the count model
   l = length(unique(df$skipped))
   if (l == 1) {
     fit <- list(model = "constant",
@@ -370,7 +374,7 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 
       # manually obtain the variance matrix as pscl::zeroinfl does not
       # provide covariance between log(size) and (log(mu), logit(pi))
-      vtheta = solve(optimHess(theta, nllik, gr=NULL, df$skipped))
+      vtheta = solve(optimHess(theta, nllik, gr = NULL, df$skipped))
 
       fit <- list(model = "zinb",
                   theta = theta,
@@ -387,6 +391,8 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
                  (1-pi)*dnbinom(y[-1], size, prob))
 
       post = mvtnorm::rmvnorm(nreps, mean = fit$theta, sigma = fit$vtheta)
+    } else {
+      stop("incorrect model for ki")
     }
   }
 
@@ -666,16 +672,13 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
       gf <- dplyr::tibble(x = as.numeric(a$fitted[,"usubjid"]),
                           y = as.numeric(a$residuals[,"usubjid"]))
 
-      # number of observations by subject
-      m <- (df %>% dplyr::summarise(n = dplyr::n(),
-                                    .groups = "drop_last"))$n
-
-      # mean dose by subject
-      d <- (df %>% dplyr::summarise(d = mean(.data$dose),
-                                    .groups = "drop_last"))$d
+      # number of observations and mean dose by subject
+      df1 <- df %>% dplyr::summarise(n = dplyr::n(),
+                                     d = mean(.data$dose),
+                                     .groups = "drop_last")
 
       # fix the variance parameters to avoid drawing too extreme values
-      # of sigma_b due to the large variance of log(sigma_b), i.e.
+      # of sigma_b due to the large variance of log(sigma_b) in case that
       # the variance component is likely to be zero
       sigma_b = rep(fit$sigmab, nreps)
       sigma_e = rep(fit$sigmae, nreps)
@@ -690,10 +693,12 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
       # random effects model parameters
       theta_ran = matrix(0, nreps, N)
       for (i in 1:N) {
-        si1 = m[i]/sigma_e2*(d[i] - mud)
-        si2 = m[i]/sigma_e2 + 1/sigma_b2
+        si1 = df1$n[i]/sigma_e2*(df1$d[i] - mud)
+        si2 = df1$n[i]/sigma_e2 + 1/sigma_b2
         theta_ran[,i] = si1/si2 + sqrt(1/si2)*rnorm(nreps)
       }
+    } else {
+      stop("incorrect model for Ti")
     }
   }
 
@@ -810,12 +815,18 @@ f_dispensing_models <- function(
 
   if (nrow(vf0) == length(unique(vf0$treatment)) &
       length(unique(target_days)) == 1) {
-    # fit a common model for k0, t0, t1, ki, ti across drugs
+    # fit a common model for k0, t0, t1, ki, and ti across drugs
     common_time_model = TRUE
     delta = target_days[1]
 
+    # only keep one record per subject and drug dispensing day
+    vf1 <- vf %>%
+      dplyr::group_by(.data$usubjid, .data$day) %>%
+      dplyr::slice(dplyr::n()) %>%
+      dplyr::group_by(.data$usubjid)
+
     # time from randomization to the first drug dispensing visit
-    df_k0 <- vf %>%
+    df_k0 <- vf1 %>%
       dplyr::filter(.data$row_id == 1) %>%
       dplyr::mutate(time = .data$day,
                     skipped = floor((.data$time - delta/2)/delta) + 1)
@@ -856,7 +867,7 @@ f_dispensing_models <- function(
     }
 
     # gap time and number of skipped visits between drug dispensing visits
-    df_ti <- vf %>%
+    df_ti <- vf1 %>%
       dplyr::mutate(time = dplyr::lead(.data$day) - .data$day,
                     skipped = pmax(floor((.data$time - delta/2)/delta), 0),
                     k1 = .data$skipped + 1) %>%
