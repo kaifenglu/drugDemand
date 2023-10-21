@@ -13,12 +13,14 @@
 #' @param fit_ti The model fit for the gap time between two
 #'   consecutive drug dispensing visits.
 #' @param vf_ongoing1 The last observed drug dispensing date for
-#'   ongoing patients, with or without the associated drug information.
+#'   ongoing patients with drug dispensing records, with or without
+#'   the associated drug information.
 #' @param vf_new1 The randomization date for new patients and ongoing
 #'   patients with no drug dispensing records, with or without the
 #'   associated drug information.
 #'
-#' @return Drug dispensing visit dates at the subject level.
+#' @return A data frame containing the drug dispensing visit dates
+#' at the subject level.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -233,7 +235,6 @@ f_dosing_draw_t_1 <- function(
       dplyr::mutate(status = "new")
   }
 
-
   # combine drug dispensing dates from ongoing and new patients
   if (is.null(vf_new1)) {  # real-time after enrollment completion
     dosing_subject_newi <- df_ongoingi
@@ -266,11 +267,10 @@ f_dosing_draw_t_1 <- function(
 #' @param fit_di The model fit for the dispensed doses at drug
 #'   dispensing visits.
 #' @param vf_ongoing The observed drug dispensing data for ongoing
-#'   patients.
-#' @param vf_new The randomization date for new patients and ongoing
-#'   patients with no drug dispensing records.
+#'   patients with drug dispensing records.
 #' @param vf_ongoing1 The last observed drug dispensing date for
-#'   ongoing patients, with or without the associated drug information.
+#'   ongoing patients with drug dispensing records, with or without
+#'   the associated drug information.
 #' @param vf_new1 The randomization date for new patients and ongoing
 #'   patients with no drug dispensing records, with or without the
 #'   associated drug information.
@@ -282,11 +282,11 @@ f_dosing_draw_t_1 <- function(
 #'
 #' @return A list of two components:
 #'
-#' * \code{dosing_subject_newi} for the drug dispensing data at the
-#'   subject level by date for the given iteration.
+#' * \code{dosing_subject_newi}: A data frame for the drug dispensing
+#' data at the subject level by date for the given iteration.
 #'
-#' * \code{dosing_summary_newi} for the drug dispensing summary data
-#'   by drug, time, and simulation draw for the given iteration.
+#' * \code{dosing_summary_newi}: A data frame for the drug dispensing
+#' summary data by drug, time, and simulation draw for the given iteration.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -405,7 +405,7 @@ f_dosing_draw_t_1 <- function(
 #'   1, fit$common_time_model,
 #'   fit$fit_k0, fit$fit_t0, fit$fit_t1,
 #'   fit$fit_ki, fit$fit_ti, fit$fit_di,
-#'   vf_ongoing, vf_new, vf_ongoing1, vf_new1,
+#'   vf_ongoing, vf_ongoing1, vf_new1,
 #'   treatment_by_drug_df, t)
 #'
 #' head(list1$dosing_subject_newi)
@@ -417,7 +417,7 @@ f_dosing_draw_1 <- function(
     i, common_time_model,
     fit_k0, fit_t0, fit_t1,
     fit_ki, fit_ti, fit_di,
-    vf_ongoing, vf_new, vf_ongoing1, vf_new1,
+    vf_ongoing, vf_ongoing1, vf_new1,
     treatment_by_drug_df, t) {
 
   l = length(unique(treatment_by_drug_df$drug))
@@ -564,8 +564,8 @@ f_dosing_draw_1 <- function(
 #' @return A list with two components:
 #'
 #' * \code{dosing_subject_new} A data frame containing observed and
-#' imputed subject-level dosing records for ongoing and new patients.
-#' It contains the following variables:
+#' imputed subject-level dosing records for ongoing and new patients
+#' for the first iteration. It contains the following variables:
 #' \code{draw}, \code{drug}, \code{drug_name}, \code{dose_unit},
 #' \code{usubjid}, \code{day}, \code{dose}, \code{arrivalTime},
 #' \code{treatment}, \code{treatment_description}, \code{time},
@@ -639,8 +639,8 @@ f_dosing_draw_1 <- function(
 #'   df, vf, newEvents, treatment_by_drug_df,
 #'   fit$common_time_model,
 #'   fit$fit_k0, fit$fit_t0, fit$fit_t1,
-#'   fit$fit_ki, fit$fit_ti, fit$fit_di, t0, t,
-#'   n.cores.max = 2)
+#'   fit$fit_ki, fit$fit_ti, fit$fit_di,
+#'   t0, t, n.cores.max = 2)
 #'
 #' head(a$dosing_subject_new)
 #' head(a$dosing_summary_new)
@@ -651,8 +651,8 @@ f_dosing_draw <- function(
     df, vf, newEvents, treatment_by_drug_df,
     common_time_model,
     fit_k0, fit_t0, fit_t1,
-    fit_ki, fit_ti, fit_di, t0, t,
-    n.cores.max) {
+    fit_ki, fit_ti, fit_di,
+    t0, t, n.cores.max) {
 
   nreps = length(unique(newEvents$draw))
   l = length(unique(treatment_by_drug_df$drug))
@@ -726,7 +726,7 @@ f_dosing_draw <- function(
                       D = pmin(.data$time - 1, t1 - .data$arrivalTime)) %>%
         dplyr::select(-c(.data$drug, .data$drug_name, .data$dose_unit))
     } else {
-      vf_new1 = NULL
+      vf_new1 <- NULL
     }
   } else {
     vf_ongoing1 <- vf_ongoing %>%
@@ -738,10 +738,14 @@ f_dosing_draw <- function(
                     D = pmin(.data$time - 1, t1 - .data$arrivalTime)) %>%
       dplyr::select(-c(.data$day, .data$dose))
 
-    vf_new1 <- vf_new %>%
-      dplyr::mutate(V = 0,
-                    C = as.numeric(t0 - .data$arrivalTime),
-                    D = pmin(.data$time - 1, t1 - .data$arrivalTime))
+    if (!is.null(vf_new)) {
+      vf_new1 <- vf_new %>%
+        dplyr::mutate(V = 0,
+                      C = as.numeric(t0 - .data$arrivalTime),
+                      D = pmin(.data$time - 1, t1 - .data$arrivalTime))
+    } else {
+      vf_new1 <- NULL
+    }
   }
 
 
@@ -751,7 +755,7 @@ f_dosing_draw <- function(
     i, common_time_model,
     fit_k0, fit_t0, fit_t1,
     fit_ki, fit_ti, fit_di,
-    vf_ongoing, vf_new, vf_ongoing1, vf_new1,
+    vf_ongoing, vf_ongoing1, vf_new1,
     treatment_by_drug_df, t)
 
   dosing_subject_new <- list1$dosing_subject_newi
@@ -771,7 +775,7 @@ f_dosing_draw <- function(
       i, common_time_model,
       fit_k0, fit_t0, fit_t1,
       fit_ki, fit_ti, fit_di,
-      vf_ongoing, vf_new, vf_ongoing1, vf_new1,
+      vf_ongoing, vf_ongoing1, vf_new1,
       treatment_by_drug_df, t)$dosing_summary_newi
   }
 
