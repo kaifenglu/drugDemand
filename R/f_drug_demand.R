@@ -30,9 +30,9 @@ f_treatment_by_drug_df <- function(
   l = ncol(treatment_by_drug)
 
   dplyr::tibble(treatment = rep(1:k, l),
-                drug = rep(1:l, each=k),
-                drug_name = rep(drug_name[1:l], each=k),
-                dose_unit = rep(dose_unit[1:l], each=k),
+                drug = rep(1:l, each = k),
+                drug_name = rep(drug_name[1:l], each = k),
+                dose_unit = rep(dose_unit[1:l], each = k),
                 included = as.logical(treatment_by_drug)) %>%
     dplyr::filter(.data$included) %>%
     dplyr::select(.data$treatment, .data$drug, .data$drug_name,
@@ -80,7 +80,6 @@ f_treatment_by_drug_df <- function(
 #'   dispensing visits.
 #' @param pilevel The prediction interval level.
 #' @param nyears The number of years after the data cut for prediction.
-#' @param nreps The number of replications for simulation.
 #' @param n.cores.max The maximum number of cores to use for parallel
 #'   computing. The actual number of cores used will be the minimum of
 #'   \code{n.cores.max} and half of the detected number of cores.
@@ -160,7 +159,6 @@ f_treatment_by_drug_df <- function(
 #'   model_di = "lme",
 #'   pilevel = 0.95,
 #'   nyears = 1,
-#'   nreps = 200,
 #'   n.cores.max = 2,
 #'   showplot = FALSE)
 #'
@@ -182,8 +180,7 @@ f_drug_demand <- function(
     model_ki = "zip",
     model_di = "lme",
     pilevel = 0.9,
-    nyears = 4,
-    nreps = 500,
+    nyears = 2,
     n.cores.max = 10,
     showplot = TRUE) {
 
@@ -191,16 +188,19 @@ f_drug_demand <- function(
     stop("newEvents must be provided.")
   }
 
+  nreps = length(unique(newEvents$draw))
+
   # trial start date and cutoff date
   if (!is.null(df)) {
     trialsdt = df$trialsdt[1]
     cutoffdt = df$cutoffdt[1]
     df <- df %>%
-      dplyr::mutate(arrivalTime = as.numeric(.data$randdt - trialsdt + 1))
+      dplyr::mutate(arrivalTime = as.numeric(
+        .data$randdt - .data$trialsdt + 1))
   }
 
 
-  # set up drug/subject/date drug dispensing data
+  # set up drug/subject/day drug dispensing data
   if (!is.null(visitview)) {
     vf <- visitview %>%
       dplyr::inner_join(df, by = "usubjid") %>%
@@ -300,8 +300,8 @@ f_drug_demand <- function(
     a <- f_dosing_draw(df, vf, newEvents, treatment_by_drug_df,
                        fit$common_time_model,
                        fit$fit_k0, fit$fit_t0, fit$fit_t1,
-                       fit$fit_ki, fit$fit_ti, fit$fit_di, t0, t,
-                       n.cores.max)
+                       fit$fit_ki, fit$fit_ti, fit$fit_di,
+                       t0, t, n.cores.max)
 
 
     # subject level dosing data for the first simulation run
@@ -319,8 +319,8 @@ f_drug_demand <- function(
           .data$arrivalTime + .data$time - 1 <= t0, "discontinued",
           ifelse(.data$arrivalTime <= t0, "ongoing", "new")),
         imputed = ifelse(.data$arrivalTime + .data$day - 1 > t0, 1, 0)) %>%
-      dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit,
-                     .data$usubjid, .data$day) %>%
+      dplyr::arrange(.data$usubjid, .data$day,
+                     .data$drug, .data$drug_name, .data$dose_unit) %>%
       dplyr::mutate(
         trialsdt = trialsdt, cutoffdt = cutoffdt,
         randdt = as.Date(.data$arrivalTime - 1, origin = trialsdt),
@@ -329,9 +329,11 @@ f_drug_demand <- function(
 
     # dosing summary by drug, t, draw
     dosing_summary <- a$dosing_summary_new %>%
-      dplyr::inner_join(dosing_summary_stopped,
+      dplyr::right_join(dosing_summary_stopped,
                         by = c("drug", "drug_name", "dose_unit")) %>%
-      dplyr::mutate(total_dose = .data$total_dose_a + .data$total_dose_b)
+      dplyr::mutate(total_dose = .data$total_dose_a +
+                      ifelse(is.na(.data$total_dose_b), 0,
+                             .data$total_dose_b))
 
     # dosing overview by drug, t
     dosing_overview <- dosing_summary %>%
@@ -378,10 +380,10 @@ f_drug_demand <- function(
       fig[[j]] <- plotly::plot_ly() %>%
         plotly::add_lines(
           data = dfb_pp, x = ~t, y = ~n, name = "median prediction pp",
-          line = list(width=2)) %>%
+          line = list(width = 2)) %>%
         plotly::add_ribbons(
           data = dfb_pp, x = ~t, ymin = ~lower, ymax = ~upper,
-          fill = "tonexty", line = list(width=0),
+          fill = "tonexty", line = list(width = 0),
           name = "prediction interval pp") %>%
         plotly::layout(
           xaxis = list(title = "Days since trial start", zeroline = FALSE),
@@ -394,7 +396,7 @@ f_drug_demand <- function(
             x = 0.5, y = 1,
             text = paste0("<b>", dfb_pp$drug_name[1], "</b>"),
             xanchor = "center", yanchor = "bottom",
-            showarrow = FALSE, xref='paper', yref='paper'))
+            showarrow = FALSE, xref = 'paper', yref = 'paper'))
     }
   } else {
     for (j in 1:l) {
@@ -408,24 +410,24 @@ f_drug_demand <- function(
       fig[[j]] <- plotly::plot_ly() %>%
         plotly::add_lines(
           data = dfa, x = ~date, y = ~n, name = "observed",
-          line = list(shape="hv", width=2)) %>%
+          line = list(shape ="hv", width = 2)) %>%
         plotly::add_lines(
           data = dfb, x = ~date, y = ~n, name = "median prediction",
-          line = list(width=2)) %>%
+          line = list(width = 2)) %>%
         plotly::add_ribbons(
           data = dfb, x = ~date, ymin = ~lower, ymax = ~upper,
-          fill = "tonexty", line = list(width=0),
+          fill = "tonexty", line = list(width = 0),
           name = "prediction interval") %>%
         plotly::add_lines(
           data = dfb_pp, x = ~date, y = ~n, name = "median prediction pp",
-          line = list(width=2)) %>%
+          line = list(width = 2)) %>%
         plotly::add_ribbons(
           data = dfb_pp, x = ~date, ymin = ~lower, ymax = ~upper,
-          fill = "tonexty", line = list(width=0),
+          fill = "tonexty", line = list(width = 0),
           name = "prediction interval pp") %>%
         plotly::add_lines(
           x = rep(cutoffdt, 2), y = c(min(dfa$n), max(dfb_pp$upper)),
-          name = "cutoff", line = list(dash="dash"),
+          name = "cutoff", line = list(dash = "dash"),
           showlegend = FALSE) %>%
         plotly::layout(
           xaxis = list(title = "", zeroline = FALSE),
@@ -438,7 +440,7 @@ f_drug_demand <- function(
             x = 0.5, y = 1,
             text = paste0("<b>", dfb_pp$drug_name[1], "</b>"),
             xanchor = "center", yanchor = "bottom",
-            showarrow = FALSE, xref='paper', yref='paper'))
+            showarrow = FALSE, xref = 'paper', yref = 'paper'))
 
       if (j==1) {
         fig[[j]] <- fig[[j]] %>%
