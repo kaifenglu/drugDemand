@@ -89,6 +89,18 @@ f_treatment_by_drug_df <- function(
 #'
 #' @return A list with the following components:
 #'
+#' * \code{cum_dispense_plot} The step plot for the cumulative doses
+#' dispensed for each drug.
+#'
+#' * \code{bar_t0_plot} The bar chart for the time between randomization
+#' and the first drug dispensing visit.
+#'
+#' * \code{bar_ti_plot} The bar chart for the gap time between two
+#' consecutive drug dispensing visits.
+#'
+#' * \code{bar_di_plot} The bar chart for the doses dispensed at drug
+#' dispensing visits.
+#'
 #' * \code{common_time_model} A Boolean variable that indicates whether
 #' a common time model is used for drug dispensing visits.
 #'
@@ -179,7 +191,7 @@ f_drug_demand <- function(
     model_t0 = "exponential",
     model_ki = "zip",
     model_di = "lme",
-    pilevel = 0.9,
+    pilevel = 0.95,
     nyears = 2,
     n.cores.max = 10,
     showplot = TRUE) {
@@ -188,69 +200,26 @@ f_drug_demand <- function(
     stop("newEvents must be provided.")
   }
 
+  if (!is.null(visitview) && is.null(df)) {
+    stop("df must be provided if visitview is provided.")
+  }
+
   nreps = length(unique(newEvents$draw))
 
   # trial start date and cutoff date
   if (!is.null(df)) {
     trialsdt = df$trialsdt[1]
     cutoffdt = df$cutoffdt[1]
-    df <- df %>%
-      dplyr::mutate(arrivalTime = as.numeric(
-        .data$randdt - .data$trialsdt + 1))
   }
-
 
   # set up drug/subject/day drug dispensing data
   if (!is.null(visitview)) {
-    vf <- visitview %>%
-      dplyr::inner_join(df, by = "usubjid") %>%
-      dplyr::mutate(day = as.numeric(.data$date - .data$randdt + 1)) %>%
-      dplyr::select(.data$drug, .data$drug_name, .data$dose_unit,
-                    .data$usubjid, .data$treatment,
-                    .data$treatment_description, .data$arrivalTime,
-                    .data$time, .data$event, .data$dropout,
-                    .data$day, .data$dispensed_quantity) %>%
-      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                      .data$usubjid, .data$treatment,
-                      .data$treatment_description, .data$arrivalTime,
-                      .data$time, .data$event, .data$dropout,
-                      .data$day) %>%
-      dplyr::summarise(dose = sum(.data$dispensed_quantity),
-                       .groups = "drop_last") %>%
-      dplyr::mutate(cum_dose = cumsum(.data$dose)) %>%
-      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                      .data$usubjid) %>%
-      dplyr::mutate(row_id = dplyr::row_number())
+    observed <- f_dose_observed(df, visitview, showplot = showplot)
+    vf = observed$vf
+    dosing_summary_t = observed$dosing_summary_t %>%
+      dplyr::mutate(pilevel = pilevel)
 
-
-    # obtain the observed time points relative to trial start
-    t_df <- vf %>% dplyr::mutate(t1 = .data$arrivalTime + .data$day - 1)
-    t_obs <- sort(unique(t_df$t1))
-
-    # obtain the subset of dosing records before each observed time point
-    dosing_subject_t <- dplyr::tibble(t = t_obs) %>%
-      dplyr::cross_join(vf) %>%
-      dplyr::filter(.data$arrivalTime + .data$day - 1 <= .data$t) %>%
-      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                      .data$t, .data$usubjid) %>%
-      dplyr::mutate(cum_dose = cumsum(.data$dose)) %>%
-      dplyr::slice(dplyr::n())
-
-    # tally the doses across patients
-    dosing_summary_t <- dosing_subject_t %>%
-      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                      .data$t) %>%
-      dplyr::summarise(n = sum(.data$cum_dose), .groups = "drop_last") %>%
-      dplyr::mutate(pilevel = pilevel, lower = NA, upper = NA,
-                    mean = .data$n, var = 0)
-
-    # obtain the cumulative doses up to cutoff
-    dosing_summary_t0 <- dosing_summary_t %>%
-      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit) %>%
-      dplyr::slice(dplyr::n()) %>%
-      dplyr::rename(cum_dose_t0 = .data$n) %>%
-      dplyr::select(.data$drug, .data$drug_name, .data$dose_unit,
-                    .data$cum_dose_t0)
+    dosing_summary_t0 = observed$dosing_summary_t0
 
     # extract drug description from observed data
     drug_description_df <- dosing_summary_t0 %>%
@@ -279,17 +248,10 @@ f_drug_demand <- function(
                               t0, t, pilevel)
 
   # dosing prediction based on modeling and simulation
-  if (!is.null(visitview)) {
-    # dosing summary for subjects who discontinued treatment before cutoff
-    dosing_subject_stopped <- vf %>% dplyr::filter(.data$event == 1)
-
-    dosing_summary_stopped <- dosing_subject_stopped %>%
-      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                      .data$usubjid) %>%
-      dplyr::slice(dplyr::n()) %>%
-      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit) %>%
-      dplyr::summarise(total_dose_a = sum(.data$cum_dose),
-                       .groups = "drop_last")
+  if (!is.null(vf)) {
+    # add date information for prediction per protocol
+    dosing_pred_pp <- dosing_pred_pp %>%
+      dplyr::mutate(date = as.Date(.data$t - 1, origin = trialsdt))
 
     # model fit to the observed drug dispensing data
     fit <- f_dispensing_models(dosing_schedule_df$target_days, vf,
@@ -303,6 +265,17 @@ f_drug_demand <- function(
                        fit$fit_ki, fit$fit_ti, fit$fit_di,
                        t0, t, n.cores.max)
 
+
+    # dosing summary for subjects who discontinued treatment before cutoff
+    dosing_subject_stopped <- vf %>% dplyr::filter(.data$event == 1)
+
+    dosing_summary_stopped <- dosing_subject_stopped %>%
+      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
+                      .data$usubjid) %>%
+      dplyr::slice(dplyr::n()) %>%
+      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit) %>%
+      dplyr::summarise(total_dose_a = sum(.data$cum_dose),
+                       .groups = "drop_last")
 
     # subject level dosing data for the first simulation run
     dosing_subject <- dosing_subject_stopped %>%
@@ -319,8 +292,8 @@ f_drug_demand <- function(
           .data$arrivalTime + .data$time - 1 <= t0, "discontinued",
           ifelse(.data$arrivalTime <= t0, "ongoing", "new")),
         imputed = ifelse(.data$arrivalTime + .data$day - 1 > t0, 1, 0)) %>%
-      dplyr::arrange(.data$usubjid, .data$day,
-                     .data$drug, .data$drug_name, .data$dose_unit) %>%
+      dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit,
+                     .data$usubjid, .data$day) %>%
       dplyr::mutate(
         trialsdt = trialsdt, cutoffdt = cutoffdt,
         randdt = as.Date(.data$arrivalTime - 1, origin = trialsdt),
@@ -364,9 +337,6 @@ f_drug_demand <- function(
                      .data$t) %>%
       dplyr::mutate(date = as.Date(.data$t - 1, origin = trialsdt))
 
-    # add date information for prediction per protocol
-    dosing_pred_pp <- dosing_pred_pp %>%
-      dplyr::mutate(date = as.Date(.data$t - 1, origin = trialsdt))
   }
 
 
@@ -461,7 +431,11 @@ f_drug_demand <- function(
     list(dosing_pred_pp = dosing_pred_pp,
          dosing_pred_plot = fig)
   } else {
-    list(common_time_model = fit$common_time_model,
+    list(cum_dispense_plot = observed$cum_dispense_plot,
+         bar_t0_plot = observed$bar_t0_plot,
+         bar_ti_plot = observed$bar_ti_plot,
+         bar_di_plot = observed$bar_di_plot,
+         common_time_model = fit$common_time_model,
          fit_k0 = fit$fit_k0, fit_t0 = fit$fit_t0,
          fit_t1 = fit$fit_t1, fit_ki = fit$fit_ki,
          fit_ti = fit$fit_ti, fit_di = fit$fit_di,

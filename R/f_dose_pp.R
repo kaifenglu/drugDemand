@@ -32,9 +32,9 @@ f_cum_dose <- function(x, w, d, N) {
 #' @description Obtains drug demand prediction based on protocol-assumed
 #' visit and dosing schedules.
 #'
-#' @param dosing_summary_t0 The cumulative doses dispensed
-#'   before the cutoff date. It contains the following variables:
-#'   \code{drug}, \code{drug_name}, \code{dose_unit},
+#' @param dosing_summary_t0 A data frame for the cumulative doses
+#'   dispensed before the cutoff date. It contains the following
+#'   variables: \code{drug}, \code{drug_name}, \code{dose_unit},
 #'   and \code{cum_dose_t0}.
 #' @param newEvents A data frame containing the imputed event data
 #'   for both ongoing and new patients, typically obtained from
