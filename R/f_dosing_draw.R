@@ -586,7 +586,7 @@ f_dosing_draw_1 <- function(
 #' library(dplyr)
 #'
 #' df <- df2 %>%
-#'   mutate(arrivalTime = as.numeric(.data$randdt - trialsdt + 1))
+#'   mutate(arrivalTime = as.numeric(randdt - trialsdt + 1))
 #'
 #' vf <- visitview2 %>%
 #'   inner_join(df, by = "usubjid") %>%

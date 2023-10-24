@@ -664,8 +664,8 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
       fit <- list(model = "lme",
                   mud = as.numeric(a$coefficients$fixed),
                   vmud = as.numeric(vcov(a)),
-                  sigmab = as.numeric(exp(attr(a$apVar, "Pars")))[1],
-                  sigmae = as.numeric(exp(attr(a$apVar, "Pars")))[2],
+                  sigmab = exp(as.numeric(attr(a$apVar, "Pars")))[1],
+                  sigmae = exp(as.numeric(attr(a$apVar, "Pars")))[2],
                   aic = as.numeric(AIC(a)),
                   bic = as.numeric(BIC(a)))
 
@@ -806,15 +806,7 @@ f_dispensing_models <- function(
     target_days, vf, model_k0, model_t0, model_ki, model_di,
     nreps, showplot = TRUE) {
 
-  # tally the number of drugs taken by patient each day by treatment
-  vf0 <- vf %>%
-    dplyr::group_by(.data$treatment, .data$usubjid, .data$day) %>%
-    dplyr::summarise(n = dplyr::n(), .groups = "drop_last") %>%
-    dplyr::group_by(.data$treatment, .data$n) %>%
-    dplyr::summarise(count = dplyr::n(), .groups = "drop_last")
-
-  if (nrow(vf0) == length(unique(vf0$treatment)) &
-      length(unique(target_days)) == 1) {
+  if (length(unique(target_days)) == 1) {
     # fit a common model for k0, t0, t1, ki, and ti across drugs
     common_time_model = TRUE
     delta = target_days[1]
