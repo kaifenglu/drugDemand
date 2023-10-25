@@ -193,9 +193,13 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 
   # graphically assess the model fit
   modeltext = fit$model
-  aictext = paste("AIC:", round(fit$aic,2))
-  bictext = paste("BIC:", round(fit$bic,2))
-
+  if (modeltext != "constant") {
+    aictext = paste("AIC:", round(fit$aic,2))
+    bictext = paste("BIC:", round(fit$bic,2))
+  } else {
+    aictext = ""
+    bictext = ""
+  }
 
   gf <- dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
 
@@ -401,8 +405,13 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 
   # graphically assess the model fit
   modeltext = fit$model
-  aictext = paste("AIC:", round(fit$aic,2))
-  bictext = paste("BIC:", round(fit$bic,2))
+  if (modeltext != "constant") {
+    aictext = paste("AIC:", round(fit$aic,2))
+    bictext = paste("BIC:", round(fit$bic,2))
+  } else {
+    aictext = ""
+    bictext = ""
+  }
 
   gf <- dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
 
@@ -423,7 +432,6 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
       showarrow = FALSE))
 
   if (showplot) print(fig)
-
 
   list(fit = fit, fit_plot = fig, theta = post)
 }
@@ -449,7 +457,7 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 #' @param nreps The number of simulations for drawing posterior model
 #'   parameter values.
 #' @param showplot A Boolean variable that controls whether or not to
-#'   show the residual plot. It defaults to \code{TRUE}.
+#'   show the fitted gap time bar chart. It defaults to \code{TRUE}.
 #'
 #' @return A list of results from the regression model fit, including
 #'
@@ -469,7 +477,7 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 #'
 #' Additionally, the function provides:
 #'
-#' * A residual plot.
+#' * A fitted gap time bar chart.
 #'
 #' * Posterior draws of model parameters.
 #'
@@ -529,11 +537,40 @@ f_fit_ti <- function(df, model = "lm", nreps, showplot = TRUE) {
               aic = as.numeric(AIC(a)),
               bic = as.numeric(BIC(a)))
 
-  fig <- plotly::plot_ly(x = ~a$fitted.values,
-                         y = ~a$residuals,
-                         type = 'scatter', mode = 'markers') %>%
-    plotly::layout(xaxis = list(title = 'Fitted values'),
-                   yaxis = list(title = 'Residuals'))
+  x = table(df$time)
+  count = as.numeric(x)
+  y.obs = as.numeric(names(x))
+  ymax = max(y.obs)
+  y = 1:ymax
+  p.obs = rep(0, ymax)
+  p.obs[y.obs] = count/sum(count)
+
+  p.fit <- purrr::map_vec(y, function(y) {
+    mean(pnorm((y + 0.5 - fit$beta*df$k1)/fit$sigma) -
+           pnorm((y - 0.5 - fit$beta*df$k1)/fit$sigma))
+  })
+
+  gf = dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
+
+  modeltext = fit$model
+  aictext = paste("AIC:", round(fit$aic,2))
+  bictext = paste("BIC:", round(fit$bic,2))
+
+  fig <- plotly::plot_ly(gf, x = ~y, y = ~p.obs, type = 'bar',
+                         name = 'Observed')
+  fig <- fig %>% plotly::add_trace(y = ~p.fit, name = 'Fitted')
+  fig <- fig %>% plotly::layout(
+    xaxis = list(title = 'Days between consecutive drug dispensing visits'),
+    yaxis = list(title = 'Proportion'),
+    barmode = 'group')
+
+  fig <- fig %>% plotly::layout(
+    annotations = list(
+      x = c(0.7, 0.7, 0.7), y = c(0.95, 0.80, 0.65), xref = "paper",
+      yref = "paper", text = paste('<i>', c(modeltext, aictext,
+                                            bictext), '</i>'),
+      xanchor = "left", font = list(size = 14, color = "red"),
+      showarrow = FALSE))
 
   if (showplot) print(fig)
 
@@ -862,6 +899,8 @@ f_dispensing_models <- function(
       dplyr::mutate(time = .data$day,
                     skipped = floor((.data$time - delta/2)/delta) + 1)
 
+    fit_k0 <- f_fit_ki(df_k0, model_k0, nreps, showplot)
+
     # no skipping
     df_t0 <- df_k0 %>%
       dplyr::filter(.data$skipped == 0) %>%
@@ -875,14 +914,6 @@ f_dispensing_models <- function(
       dplyr::mutate(k1 = .data$skipped)
 
     if (nrow(df_t1) == 0) {
-      fit_k0 <- list(fit = list(model = "constant",
-                                theta = 0,
-                                vtheta = 0,
-                                aic = NA,
-                                bic = NA),
-                     fit_plot = NA,
-                     theta = rep(0, nreps))
-
       fit_t1 <- list(fit = list(model = "lm",
                                 beta = 0,
                                 vbeta = 0,
@@ -893,7 +924,6 @@ f_dispensing_models <- function(
                      fit_plot = NA,
                      theta = matrix(0, nreps, 2))
     } else {
-      fit_k0 <- f_fit_ki(df_k0, model_k0, nreps, showplot)
       fit_t1 <- f_fit_ti(df_t1, "lm", nreps, showplot)
     }
 
@@ -924,6 +954,8 @@ f_dispensing_models <- function(
         dplyr::mutate(time = .data$day,
                       skipped = floor((.data$time - delta/2)/delta) + 1)
 
+      fit_k0[[h]] <- f_fit_ki(df_k0, model_k0, nreps, showplot)
+
       # no skipping
       df_t0 <- df_k0 %>%
         dplyr::filter(.data$skipped == 0) %>%
@@ -937,14 +969,6 @@ f_dispensing_models <- function(
         dplyr::mutate(k1 = .data$skipped)
 
       if (nrow(df_t1) == 0) {
-        fit_k0[[h]] <- list(fit = list(model = "constant",
-                                       theta = 0,
-                                       vtheta = 0,
-                                       aic = NA,
-                                       bic = NA),
-                            fit_plot = NA,
-                            theta = rep(0, nreps))
-
         fit_t1[[h]] <- list(fit = list(model = "lm",
                                        beta = 0,
                                        vbeta = 0,
@@ -955,7 +979,6 @@ f_dispensing_models <- function(
                             fit_plot = NA,
                             theta = matrix(0, nreps, 2))
       } else {
-        fit_k0[[h]] <- f_fit_ki(df_k0, model_k0, nreps, showplot)
         fit_t1[[h]] <- f_fit_ti(df_t1, "lm", nreps, showplot)
       }
 
