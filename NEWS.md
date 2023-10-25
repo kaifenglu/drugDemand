@@ -10,7 +10,7 @@
 - change "as.numeric(exp(attr(a$apVar, "Pars")))" to "exp(as.numeric(attr(a$apVar, "Pars")))" in the f_fit_di function to avoid the error for non-numeric argument to mathematical function
 - simplify the condition for common_time_model to "length(unique(target_days)) == 1"
 - add dosing_summary_t0 to the output of the f_drug_demand function
-- replace mutate and slice(n()) with summarise in the f_dose_observed and f_dose_draw functions
+- replace mutate and slice(n()) with summarise in the f_dose_observed and f_dose_draw functions to improve efficiency
 
 # drugDemand 0.1.0
 
