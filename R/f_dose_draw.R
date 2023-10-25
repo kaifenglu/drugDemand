@@ -134,7 +134,7 @@
 #'          D = pmin(time - 1, t1 - arrivalTime)) %>%
 #'   select(-c(drug, drug_name, dose_unit))
 #'
-#' dosing_subject_new1 <- f_dosing_draw_t_1(
+#' dosing_subject_new1 <- f_dose_draw_t_1(
 #'   1, fit$fit_k0, fit$fit_t0, fit$fit_t1,
 #'   fit$fit_ki, fit$fit_ti, vf_ongoing1, vf_new1)
 #'
@@ -142,7 +142,7 @@
 #' }
 #'
 #' @export
-f_dosing_draw_t_1 <- function(
+f_dose_draw_t_1 <- function(
     i, fit_k0, fit_t0, fit_t1,
     fit_ki, fit_ti,
     vf_ongoing1, vf_new1) {
@@ -401,7 +401,7 @@ f_dosing_draw_t_1 <- function(
 #'   select(-c(drug, drug_name, dose_unit))
 #'
 #' # first iteration to extract subject and summary data
-#' list1 <- f_dosing_draw_1(
+#' list1 <- f_dose_draw_1(
 #'   1, fit$common_time_model,
 #'   fit$fit_k0, fit$fit_t0, fit$fit_t1,
 #'   fit$fit_ki, fit$fit_ti, fit$fit_di,
@@ -413,7 +413,7 @@ f_dosing_draw_t_1 <- function(
 #' }
 #'
 #' @export
-f_dosing_draw_1 <- function(
+f_dose_draw_1 <- function(
     i, common_time_model,
     fit_k0, fit_t0, fit_t1,
     fit_ki, fit_ti, fit_di,
@@ -424,7 +424,7 @@ f_dosing_draw_1 <- function(
 
   # impute drug dispensing visit dates
   if (common_time_model) {
-    dosing_subject_new1 <- f_dosing_draw_t_1(
+    dosing_subject_new1 <- f_dose_draw_t_1(
       i, fit_k0, fit_t0, fit_t1,
       fit_ki, fit_ti,
       vf_ongoing1, vf_new1)
@@ -440,7 +440,7 @@ f_dosing_draw_1 <- function(
   } else {
     dosing_subject_new2 <- purrr::map_dfr(
       1:l, function(h) {
-        f_dosing_draw_t_1(
+        f_dose_draw_t_1(
           i, fit_k0[[h]], fit_t0[[h]], fit_t1[[h]],
           fit_ki[[h]], fit_ti[[h]],
           vf_ongoing1 %>% dplyr::filter(.data$drug == h),
@@ -498,13 +498,11 @@ f_dosing_draw_1 <- function(
   # drug dispensed for ongoing and new subjects by drug, t, and draw
   dosing_summary_newi <- dplyr::tibble(t = t) %>%
     dplyr::cross_join(dosing_subject_newi) %>%
+    dplyr::filter(.data$arrivalTime + .data$day - 1 <= .data$t) %>%
     dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
                     .data$t, .data$draw, .data$usubjid) %>%
-    dplyr::filter(.data$arrivalTime + .data$day - 1 <= .data$t) %>%
-    dplyr::mutate(cum_dose = cumsum(.data$dose)) %>%
-    dplyr::slice(dplyr::n()) %>%
-    dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                    .data$t, .data$draw) %>%
+    dplyr::summarise(cum_dose = sum(.data$dose),
+                     .groups = "drop_last") %>%
     dplyr::summarise(total_dose_b = sum(.data$cum_dose),
                      .groups = "drop_last")
 
@@ -557,9 +555,9 @@ f_dosing_draw_1 <- function(
 #'   dispensing visits.
 #' @param t0 The cutoff date relative to the trial start date.
 #' @param t A vector of new time points for drug dispensing predictions.
-#' @param n.cores.max The maximum number of cores to use for parallel
-#'   computing. The actual number of cores used will be the minimum of
-#'   \code{n.cores.max} and half of the detected number of cores.
+#' @param ncores_max The maximum number of cores to use for parallel
+#'   computing. The actual number of cores used is the minimum of
+#'   \code{ncores_max} and half of the detected number of cores.
 #'
 #' @return A list with two components:
 #'
@@ -635,24 +633,24 @@ f_dosing_draw_1 <- function(
 #' t1 = t0 + nyears*365
 #' t = c(seq(t0, t1, 30), t1)
 #'
-#' a <- f_dosing_draw(
+#' a <- f_dose_draw(
 #'   df, vf, newEvents, treatment_by_drug_df,
 #'   fit$common_time_model,
 #'   fit$fit_k0, fit$fit_t0, fit$fit_t1,
 #'   fit$fit_ki, fit$fit_ti, fit$fit_di,
-#'   t0, t, n.cores.max = 2)
+#'   t0, t, ncores_max = 2)
 #'
 #' head(a$dosing_subject_new)
 #' head(a$dosing_summary_new)
 #' }
 #'
 #' @export
-f_dosing_draw <- function(
+f_dose_draw <- function(
     df, vf, newEvents, treatment_by_drug_df,
     common_time_model,
     fit_k0, fit_t0, fit_t1,
     fit_ki, fit_ti, fit_di,
-    t0, t, n.cores.max) {
+    t0, t, ncores_max) {
 
   nreps = length(unique(newEvents$draw))
   l = length(unique(treatment_by_drug_df$drug))
@@ -751,7 +749,7 @@ f_dosing_draw <- function(
 
   # first iteration to extract subject and summary data
   i = 1
-  list1 <- f_dosing_draw_1(
+  list1 <- f_dose_draw_1(
     i, common_time_model,
     fit_k0, fit_t0, fit_t1,
     fit_ki, fit_ti, fit_di,
@@ -762,8 +760,8 @@ f_dosing_draw <- function(
 
 
   # register parallel backend
-  n.cores <- min(n.cores.max, parallel::detectCores()/2)
-  cl <- parallel::makeCluster(n.cores)
+  ncores <- min(ncores_max, parallel::detectCores()/2)
+  cl <- parallel::makeCluster(ncores)
   doParallel::registerDoParallel(cl)
 
   # subsequent iterations to extract summary data only
@@ -771,7 +769,7 @@ f_dosing_draw <- function(
     i = 2:nreps, .combine = "bind_rows",
     .packages = c("dplyr", "mvtnorm")
   ) %dorng% {
-    f_dosing_draw_1(
+    f_dose_draw_1(
       i, common_time_model,
       fit_k0, fit_t0, fit_t1,
       fit_ki, fit_ti, fit_di,

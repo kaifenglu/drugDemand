@@ -1,4 +1,4 @@
-#' @title Time-to-Event Model Fit for Dispensing Delay After Randomization
+#' @title Model Fit for Dispensing Delay After Randomization
 #' @description Fits a specified time-to-event model to the gap time
 #' between randomization and the first drug dispensing visit when
 #' there is no visit skipping.
@@ -222,7 +222,7 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 }
 
 
-#' @title Count Model Fit for Number of Skipped Visits
+#' @title Fit for Number of Skipped Visits
 #' @description Fits a count model to the number of skipped visits.
 #'
 #' @param df The subject-level dosing data, including \code{skipped} to
@@ -430,7 +430,7 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 }
 
 
-#' @title Linear Regression Model Fit for Gap Times
+#' @title Model Fit for Gap Times
 #' @description Fits a linear regression model to the gap times.
 #'
 #' @param df The subject-level dosing data, including the following
@@ -547,7 +547,7 @@ f_fit_ti <- function(df, model = "lm", nreps, showplot = TRUE) {
 }
 
 
-#' @title Linear Mixed-Effects Model Fit for Dispensed Doses
+#' @title Model Fit for Dispensed Doses
 #' @description Fits a linear mixed-effects model to the dispensed doses.
 #'
 #' @param df The subject-level dosing data, including \code{usubjid},

@@ -3,7 +3,7 @@
 #' A data frame with 4 rows and 3 columns:
 #' \describe{
 #'   \item{\code{drug}}{The numeric code of the drug.}
-#'   \item{\code{drug_name}}{The name of the the drug.}
+#'   \item{\code{drug_name}}{The name of the drug.}
 #'   \item{\code{dose_unit}}{The dose unit for drug dispensing.}
 #' }
 #' For drug demand forecasting, the default dose unit is "kit" for all drugs.
@@ -84,7 +84,7 @@
 #'   \item{\code{visit}}{The drug dispensing visit, e.g. "Cycle 1 Day 1".}
 #'   \item{\code{date}}{The date of the drug dispensing visit.}
 #'   \item{\code{drug}}{The numeric code of the drug.}
-#'   \item{\code{drug_name}}{The name of the the drug.}
+#'   \item{\code{drug_name}}{The name of the drug.}
 #'   \item{\code{dose_unit}}{The dose unit for drug dispensing.}
 #'   \item{\code{kit_number}}{The kit number for drug dispensing.}
 #'   \item{\code{dispensed_quantity}}{The number of kits dispensed
@@ -101,7 +101,7 @@
 #'   \item{\code{visit}}{The drug dispensing visit, e.g. "Cycle 1 Day 1".}
 #'   \item{\code{date}}{The date of the drug dispensing visit.}
 #'   \item{\code{drug}}{The numeric code of the drug.}
-#'   \item{\code{drug_name}}{The name of the the drug.}
+#'   \item{\code{drug_name}}{The name of the drug.}
 #'   \item{\code{dose_unit}}{The dose unit for drug dispensing.}
 #'   \item{\code{kit_number}}{The kit number for drug dispensing.}
 #'   \item{\code{dispensed_quantity}}{The number of kits dispensed

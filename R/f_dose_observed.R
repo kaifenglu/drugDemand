@@ -13,10 +13,10 @@ f_bar_chart <- function(x) {
 #' @title Summarize Observed Drug Dispensing Data
 #' @description Provides an overview of the observed drug dispensing data,
 #' including the trial start date, data cutoff date, cumulative number
-#' of doses dispensed by drug, bar chart of the time between randomization
-#' and the first drug dispensing visit, bar chart of the time between
-#' two consecutive drug dispensing visits, and bar chart of the dispensed
-#' doses at drug dispensing visits by drug.
+#' of doses dispensed by drug, bar chart of the gap time between randomization
+#' and the first drug dispensing visit, bar chart of the gap time between
+#' two consecutive drug dispensing visits, and bar chart of the
+#' dispensed doses at drug dispensing visits by drug.
 #'
 #' @param df A data frame for subject-level enrollment and event data,
 #'   including the following variables:
@@ -41,8 +41,12 @@ f_bar_chart <- function(x) {
 #' \code{event}, \code{dropout}, \code{day}, \code{dose},
 #' \code{cum_dose}, and \code{row_id}.
 #'
-#' * \code{dosing_summary_t} The model fit for the number of skipped
-#' visits between randomization and the first drug dispensing visit.
+#' * \code{dosing_summary_t} A data frame for the cumulative doses
+#' dispensed by each observed time point. It contains the following
+#' variables: \code{drug}, \code{drug_name}, \code{dose_unit},
+#' \code{t}, \code{n}, \code{lower}, \code{upper}, \code{mean},
+#' and \code{var}, where \code{lower} and \code{upper} have missing
+#' values, \code{mean = n}, and \code{var = 0}.
 #'
 #' * \code{dosing_summary_t0} A data frame for the cumulative doses
 #' dispensed before the cutoff date. It contains the following
@@ -52,13 +56,13 @@ f_bar_chart <- function(x) {
 #' * \code{cum_dispense_plot} The step plot for the cumulative doses
 #' dispensed for each drug.
 #'
-#' * \code{bar_t0_plot} The bar chart for the time between randomization
+#' * \code{bar_t0_plot} The bar chart for the gap time between randomization
 #' and the first drug dispensing visit.
 #'
 #' * \code{bar_ti_plot} The bar chart for the gap time between two
 #' consecutive drug dispensing visits.
 #'
-#' * \code{bar_di_plot} The bar chart for the doses dispensed at drug
+#' * \code{bar_di_plot} The bar chart for the dispensed doses at drug
 #' dispensing visits.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
@@ -113,8 +117,7 @@ f_dose_observed <- function(
     dplyr::filter(.data$arrivalTime + .data$day - 1 <= .data$t) %>%
     dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
                     .data$t, .data$usubjid) %>%
-    dplyr::mutate(cum_dose = cumsum(.data$dose)) %>%
-    dplyr::slice(dplyr::n())
+    dplyr::summarise(cum_dose = sum(.data$dose), .groups = "drop_last")
 
   # tally the doses across patients
   dosing_summary_t <- dosing_subject_t %>%

@@ -33,19 +33,19 @@
 #' * \code{k0} The number of skipped visits between randomization
 #' and the first drug dispensing visit.
 #'
-#' * \code{t0} The time elapsed between randomization and the first
-#' drug dispensing visit when k0 equals 0.
+#' * \code{t0} The gap time between randomization and the first
+#' drug dispensing visit when there is no visit skipping.
 #'
-#' * \code{t1} The time elapsed between randomization and the first
-#' drug dispensing visit when k0 is greater than 0.
+#' * \code{t1} The gap time between randomization and the first
+#' drug dispensing visit when there is visit skipping.
 #'
 #' * \code{ki} The number of skipped visits between two consecutive
 #' drug dispensing visits.
 #'
-#' * \code{ti} The time elapsed between two consecutive drug
+#' * \code{ti} The gap time between two consecutive drug
 #' dispensing visits.
 #'
-#' * \code{di} The number of kits dispensed at drug dispensing visits.
+#' * \code{di} The dispensed doses at drug dispensing visits.
 #'
 #' For \code{k0} and \code{ki}, we explore several modeling options,
 #' including constant, Poisson, zero-inflated Poisson (ZIP), and
@@ -65,7 +65,7 @@
 #' approximate posterior distributions. Subsequently, we simulate
 #' drug dispensing data after cutoff for both ongoing and new patients.
 #'
-#' Finally, we estimate the number of kits to dispense based on the
+#' Finally, we estimate the dose to dispense based on the
 #' simulated data.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}

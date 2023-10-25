@@ -1,5 +1,5 @@
 #' @title Drug to Treatment Mapping
-#' @description Obtains a data frame that indicates the treatment(s)
+#' @description Obtains a data frame that indicates the treatments
 #' associated with each drug.
 #'
 #' @param treatment_by_drug The indicator matrix of treatment by drug
@@ -40,8 +40,8 @@ f_treatment_by_drug_df <- function(
 }
 
 
-#' @title Drug Demand Prediction
-#' @description Obtains drug demand prediction via modeling and
+#' @title Drug Demand Forecasting
+#' @description Obtains drug demand forecasting via modeling and
 #' simulation.
 #'
 #' @param df A data frame for subject-level enrollment and event data,
@@ -80,14 +80,27 @@ f_treatment_by_drug_df <- function(
 #'   dispensing visits.
 #' @param pilevel The prediction interval level.
 #' @param nyears The number of years after the data cut for prediction.
-#' @param n.cores.max The maximum number of cores to use for parallel
-#'   computing. The actual number of cores used will be the minimum of
-#'   \code{n.cores.max} and half of the detected number of cores.
+#' @param ncores_max The maximum number of cores to use for parallel
+#'   computing. The actual number of cores used is the minimum of
+#'   \code{ncores_max} and half of the detected number of cores.
 #' @param showplot A Boolean variable that controls whether or not to
 #'   show the drug dispensing model fit and drug demand prediction
 #'   plots. It defaults to \code{TRUE}.
 #'
-#' @return A list with the following components:
+#' @return For design-stage drug demand forecasting, a list with the
+#' following components:
+#'
+#' * \code{dosing_pred_pp} A data frame for dosing summary by drug and
+#' time point per protocol.
+#'
+#' * \code{dosing_pred_plot} A plot object for dosing prediction.
+#'
+#' For analysis-stage drug demand forecasting, a list with the
+#' following components:
+#'
+#' * \code{dosing_summary_t0} A data frame for the cumulative doses
+#' dispensed before the cutoff date. It contains the following
+#' variables: drug, drug_name, dose_unit, and cum_dose_t0.
 #'
 #' * \code{cum_dispense_plot} The step plot for the cumulative doses
 #' dispensed for each drug.
@@ -123,7 +136,7 @@ f_treatment_by_drug_df <- function(
 #' dispensing visits.
 #'
 #' * \code{dosing_subject} A data frame for the observed and imputed
-#' subject-level dosing records.
+#' subject-level dosing records for the first iteration.
 #'
 #' * \code{dosing_pred_df} A data frame for dosing summary by drug and
 #' time point.
@@ -171,7 +184,7 @@ f_treatment_by_drug_df <- function(
 #'   model_di = "lme",
 #'   pilevel = 0.95,
 #'   nyears = 1,
-#'   n.cores.max = 2,
+#'   ncores_max = 2,
 #'   showplot = FALSE)
 #'
 #' tictoc::toc()
@@ -193,7 +206,7 @@ f_drug_demand <- function(
     model_di = "lme",
     pilevel = 0.95,
     nyears = 2,
-    n.cores.max = 10,
+    ncores_max = 10,
     showplot = TRUE) {
 
   if (is.null(newEvents)) {
@@ -259,11 +272,11 @@ f_drug_demand <- function(
                                nreps, showplot)
 
     # impute drug dispensing data for ongoing and new patients
-    a <- f_dosing_draw(df, vf, newEvents, treatment_by_drug_df,
-                       fit$common_time_model,
-                       fit$fit_k0, fit$fit_t0, fit$fit_t1,
-                       fit$fit_ki, fit$fit_ti, fit$fit_di,
-                       t0, t, n.cores.max)
+    a <- f_dose_draw(df, vf, newEvents, treatment_by_drug_df,
+                     fit$common_time_model,
+                     fit$fit_k0, fit$fit_t0, fit$fit_t1,
+                     fit$fit_ki, fit$fit_ti, fit$fit_di,
+                     t0, t, ncores_max)
 
 
     # dosing summary for subjects who discontinued treatment before cutoff
@@ -431,7 +444,8 @@ f_drug_demand <- function(
     list(dosing_pred_pp = dosing_pred_pp,
          dosing_pred_plot = fig)
   } else {
-    list(cum_dispense_plot = observed$cum_dispense_plot,
+    list(dosing_summary_t0 = observed$dosing_summary_t0,
+         cum_dispense_plot = observed$cum_dispense_plot,
          bar_t0_plot = observed$bar_t0_plot,
          bar_ti_plot = observed$bar_ti_plot,
          bar_di_plot = observed$bar_di_plot,
