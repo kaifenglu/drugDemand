@@ -98,11 +98,11 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 
   # observed probabilities
   s_t0_a <- survfit(Surv(time, status) ~ 1, data = df)
-  y.obs = s_t0_a$time
+  y.obs = s_t0_a$time - 1
   ymax = max(y.obs)
-  y = 1:ymax
-  p.obs = rep(0, ymax)
-  p.obs[y.obs] = -diff(c(1, s_t0_a$surv))
+  y = 0:ymax
+  p.obs = rep(0, ymax+1)
+  p.obs[y.obs+1] = -diff(c(1, s_t0_a$surv))
 
   # fit time-to-event models
   l = length(unique(df$time))
@@ -112,6 +112,8 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
                 vtheta = 0,
                 aic = NA,
                 bic = NA)
+
+    p.fit = 1
 
     post = rep(fit$theta, nreps)
   } else {
@@ -130,7 +132,7 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
                   bic = -2*a$llk + log(n))
 
       rate = exp(fit$theta)
-      p.fit = pexp(y, rate) - pexp(y-1, rate)
+      p.fit = pexp(y+1, rate) - pexp(y, rate)
 
       post = rnorm(nreps, mean = fit$theta, sd = sqrt(fit$vtheta))
     } else if (model == "weibull") {
@@ -147,7 +149,7 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 
       lambda = exp(fit$theta[1])
       k = exp(-fit$theta[2])
-      p.fit = pweibull(y, k, lambda) - pweibull(y-1, k, lambda)
+      p.fit = pweibull(y+1, k, lambda) - pweibull(y, k, lambda)
 
       post = mvtnorm::rmvnorm(nreps, mean = fit$theta, sigma = fit$vtheta)
     } else if (model == "log-logistic") {
@@ -164,7 +166,7 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 
       mu = fit$theta[1]
       sigma = exp(fit$theta[2])
-      p.fit = plogis(log(y), mu, sigma) - plogis(log(y-1), mu, sigma)
+      p.fit = plogis(log(y+1), mu, sigma) - plogis(log(y), mu, sigma)
 
       post = mvtnorm::rmvnorm(nreps, mean = fit$theta, sigma = fit$vtheta)
     } else if (model == "log-normal") {
@@ -180,7 +182,7 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 
       mu = fit$theta[1]
       sigma = exp(fit$theta[2])
-      p.fit = plnorm(y, mu, sigma) - plnorm(y-1, mu, sigma)
+      p.fit = plnorm(y+1, mu, sigma) - plnorm(y, mu, sigma)
 
       post = mvtnorm::rmvnorm(nreps, mean = fit$theta, sigma = fit$vtheta)
     } else {
@@ -194,29 +196,27 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
   aictext = paste("AIC:", round(fit$aic,2))
   bictext = paste("BIC:", round(fit$bic,2))
 
-  if (l > 1) {
-    gf <- dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
 
-    fig <- plotly::plot_ly(gf, x = ~y, y = ~p.obs, type = 'bar',
-                           name = 'Observed')
-    fig <- fig %>% plotly::add_trace(y = ~p.fit, name = 'Fitted')
-    fig <- fig %>% plotly::layout(
-      xaxis = list(title = 'Day for the first drug dispensing visit'),
-      yaxis = list(title = 'Proportion'),
-      barmode = 'group')
+  gf <- dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
 
-    fig <- fig %>% plotly::layout(
-      annotations = list(
-        x = c(0.7, 0.7, 0.7), y = c(0.95, 0.80, 0.65), xref = "paper",
-        yref = "paper", text = paste('<i>', c(modeltext, aictext,
-                                              bictext), '</i>'),
-        xanchor = "left", font = list(size = 14, color = "red"),
-        showarrow = FALSE))
+  fig <- plotly::plot_ly(gf, x = ~y, y = ~p.obs, type = 'bar',
+                         name = 'Observed')
+  fig <- fig %>% plotly::add_trace(y = ~p.fit, name = 'Fitted')
+  fig <- fig %>% plotly::layout(
+    xaxis = list(title = paste("Days between randomization and the",
+                               "first drug dispensing visit")),
+    yaxis = list(title = 'Proportion'),
+    barmode = 'group')
 
-    if (showplot) print(fig)
-  } else {
-    fig = NA
-  }
+  fig <- fig %>% plotly::layout(
+    annotations = list(
+      x = c(0.7, 0.7, 0.7), y = c(0.95, 0.80, 0.65), xref = "paper",
+      yref = "paper", text = paste('<i>', c(modeltext, aictext,
+                                            bictext), '</i>'),
+      xanchor = "left", font = list(size = 14, color = "red"),
+      showarrow = FALSE))
+
+  if (showplot) print(fig)
 
   list(fit = fit, fit_plot = fig, theta = post)
 }
@@ -318,6 +318,8 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
                 aic = NA,
                 bic = NA)
 
+    p.fit = 1
+
     post = rep(fit$theta, nreps)
   } else {
     if (l == 2 & model != "poisson") {
@@ -402,29 +404,26 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
   aictext = paste("AIC:", round(fit$aic,2))
   bictext = paste("BIC:", round(fit$bic,2))
 
-  if (l > 1) {
-    gf <- dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
+  gf <- dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
 
-    fig <- plotly::plot_ly(gf, x = ~y, y = ~p.obs, type = 'bar',
-                           name = 'Observed')
-    fig <- fig %>% plotly::add_trace(y = ~p.fit, name = 'Fitted')
-    fig <- fig %>% plotly::layout(
-      xaxis = list(title = 'Number of skipped visits'),
-      yaxis = list(title = 'Proportion'),
-      barmode = 'group')
+  fig <- plotly::plot_ly(gf, x = ~y, y = ~p.obs, type = 'bar',
+                         name = 'Observed')
+  fig <- fig %>% plotly::add_trace(y = ~p.fit, name = 'Fitted')
+  fig <- fig %>% plotly::layout(
+    xaxis = list(title = 'Number of skipped visits'),
+    yaxis = list(title = 'Proportion'),
+    barmode = 'group')
 
-    fig <- fig %>% plotly::layout(
-      annotations = list(
-        x = c(0.7, 0.7, 0.7), y = c(0.95, 0.80, 0.65), xref = "paper",
-        yref = "paper", text = paste('<i>', c(modeltext, aictext,
-                                              bictext), '</i>'),
-        xanchor = "left", font = list(size = 14, color = "red"),
-        showarrow = FALSE))
+  fig <- fig %>% plotly::layout(
+    annotations = list(
+      x = c(0.7, 0.7, 0.7), y = c(0.95, 0.80, 0.65), xref = "paper",
+      yref = "paper", text = paste('<i>', c(modeltext, aictext,
+                                            bictext), '</i>'),
+      xanchor = "left", font = list(size = 14, color = "red"),
+      showarrow = FALSE))
 
-    if (showplot) print(fig)
-  } else {
-    fig = NA
-  }
+  if (showplot) print(fig)
+
 
   list(fit = fit, fit_plot = fig, theta = post)
 }
@@ -558,7 +557,7 @@ f_fit_ti <- function(df, model = "lm", nreps, showplot = TRUE) {
 #' @param nreps The number of simulations for drawing posterior model
 #'   parameters.
 #' @param showplot A Boolean variable that controls whether or not to
-#'   show the residual plot. It defaults to \code{TRUE}.
+#'   show the fitted dose bar chart. It defaults to \code{TRUE}.
 #'
 #' @return A list of results from the model fit, including
 #'
@@ -576,9 +575,9 @@ f_fit_ti <- function(df, model = "lm", nreps, showplot = TRUE) {
 #'
 #' * \code{bic}: The Bayesian Information Criterion value for the model fit.
 #'
-#' Additionaly, the function provies:
+#' Additionally, the function provides:
 #'
-#' * A residual plot.
+#' * A fitted dose bar chart.
 #'
 #' * Posterior draws of model parameters.
 #'
@@ -623,6 +622,16 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
   erify::check_n(nreps)
   erify::check_bool(showplot)
 
+  # observed probabilities
+  x = table(df$dose)
+  count = as.numeric(x)
+  y.obs = as.numeric(names(x))
+  ymax = max(y.obs)
+  y = 1:ymax
+  p.obs = rep(0, ymax)
+  p.obs[y.obs] = count/sum(count)
+
+
   l = length(unique(df$dose))
   if (l == 1) {
     fit <- list(model = "constant",
@@ -632,6 +641,10 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
                 sigmae = 0,
                 aic = NA,
                 bic = NA)
+
+    p.fit = 1
+
+    gf = dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
 
     theta_fix = matrix(c(rep(fit$mud, nreps), rep(0, 2*nreps)), nreps, 3)
     theta_ran = matrix(0, nreps, N)
@@ -651,7 +664,10 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
                   aic = as.numeric(AIC(a)),
                   bic = as.numeric(BIC(a)))
 
-      gf <- dplyr::tibble(x = a$fitted.values, y = a$residuals)
+      p.fit = pnorm(y + 0.5, fit$mud, fit$sigmae) -
+        pnorm(y - 0.5, fit$mud, fit$sigmae)
+
+      gf = dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
 
       # draw sigmae and then mud given sigmae from posterior
       b2 = sqrt(a$df.residual*fit$sigmae^2/rchisq(nreps, a$df.residual))
@@ -669,8 +685,14 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
                   aic = as.numeric(AIC(a)),
                   bic = as.numeric(BIC(a)))
 
-      gf <- dplyr::tibble(x = as.numeric(a$fitted[,"usubjid"]),
-                          y = as.numeric(a$residuals[,"usubjid"]))
+      est = as.numeric(a$fitted[,"usubjid"])
+      sigmae = fit$sigmae
+
+      p.fit <- purrr::map_vec(y, function(y) {
+        mean(pnorm((y + 0.5 - est)/sigmae) - pnorm((y - 0.5 - est)/sigmae))
+      })
+
+      gf = dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
 
       # number of observations and mean dose by subject
       df1 <- df %>% dplyr::summarise(n = dplyr::n(),
@@ -707,16 +729,33 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
 
   post = list(fixed = theta_fix, random = theta_ran, usubjid = usubjid)
 
-  if (l > 1) {
-    fig <- plotly::plot_ly(data = gf, x = ~x, y = ~y,
-                           type = 'scatter', mode = 'markers') %>%
-      plotly::layout(xaxis = list(title = 'Fitted values'),
-                     yaxis = list(title = 'Residuals'))
-
-    if (showplot) print(fig)
+  # graphically assess the model fit
+  modeltext = fit$model
+  if (modeltext != "constant") {
+    aictext = paste("AIC:", round(fit$aic,2))
+    bictext = paste("BIC:", round(fit$bic,2))
   } else {
-    fig = NA
+    aictext = ""
+    bictext = ""
   }
+
+  fig <- plotly::plot_ly(gf, x = ~y, y = ~p.obs, type = 'bar',
+                         name = 'Observed')
+  fig <- fig %>% plotly::add_trace(y = ~p.fit, name = 'Fitted')
+  fig <- fig %>% plotly::layout(
+    xaxis = list(title = 'Doses dispensed at drug dispensing visits'),
+    yaxis = list(title = 'Proportion'),
+    barmode = 'group')
+
+  fig <- fig %>% plotly::layout(
+    annotations = list(
+      x = c(0.7, 0.7, 0.7), y = c(0.95, 0.80, 0.65), xref = "paper",
+      yref = "paper", text = paste('<i>', c(modeltext, aictext,
+                                            bictext), '</i>'),
+      xanchor = "left", font = list(size = 14, color = "red"),
+      showarrow = FALSE))
+
+  if (showplot) print(fig)
 
   list(fit = fit, fit_plot = fig, theta = post)
 }

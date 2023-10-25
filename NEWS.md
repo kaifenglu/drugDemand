@@ -11,6 +11,9 @@
 - simplify the condition for common_time_model to "length(unique(target_days)) == 1"
 - add dosing_summary_t0 to the output of the f_drug_demand function
 - replace mutate and slice(n()) with summarise in the f_dose_observed and f_dose_draw functions to improve efficiency
+- plot gap time t0 instead of t0 + 1 in the f_fit_t0 function
+- plot the rounded value of di based on probability calculations alongside the observed value of di in the f_fit_di function
+
 
 # drugDemand 0.1.0
 
