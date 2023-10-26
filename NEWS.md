@@ -15,6 +15,7 @@
 - plot the rounded value of di based on probability calculations alongside the observed value of di in the f_fit_di function
 - replace the residual plot with the fitted gap time bar chart in the f_fit_ti function
 - redefine row_id for vf1 if common_time_model is true in the f_dispensing_models function
+- use df and visitview to derive treatment_by_drug_df for real-time drug demand forecasting
 
 # drugDemand 0.1.0
 

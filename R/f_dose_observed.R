@@ -41,6 +41,11 @@ f_bar_chart <- function(x) {
 #' \code{event}, \code{dropout}, \code{day}, \code{dose},
 #' \code{cum_dose}, and \code{row_id}.
 #'
+#' * \code{treatment_by_drug_df} A data frame indicating the treatments
+#' associated with each drug, including the following variables:
+#' \code{treatment}, \code{drug}, \code{drug_name}, and
+#' \code{dose_unit}.
+#'
 #' * \code{dosing_summary_t} A data frame for the cumulative doses
 #' dispensed by each observed time point. It contains the following
 #' variables: \code{drug}, \code{drug_name}, \code{dose_unit},
@@ -106,6 +111,12 @@ f_dose_observed <- function(
                     .data$usubjid) %>%
     dplyr::mutate(row_id = dplyr::row_number())
 
+  treatment_by_drug_df <- vf %>%
+    dplyr::group_by(.data$treatment, .data$drug, .data$drug_name,
+                    .data$dose_unit) %>%
+    dplyr::slice(dplyr::n()) %>%
+    dplyr::select(.data$treatment, .data$drug, .data$drug_name,
+                  .data$dose_unit)
 
   # obtain the observed time points relative to trial start
   t_df <- vf %>% dplyr::mutate(t1 = .data$arrivalTime + .data$day - 1)
@@ -244,6 +255,7 @@ f_dose_observed <- function(
   }
 
   list(vf = vf,
+       treatment_by_drug_df = treatment_by_drug_df,
        dosing_summary_t = dosing_summary_t,
        dosing_summary_t0 = dosing_summary_t0,
        cum_dispense_plot = cum_dispense_plot,

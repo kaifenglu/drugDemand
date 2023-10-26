@@ -229,6 +229,8 @@ f_drug_demand <- function(
   if (!is.null(visitview)) {
     observed <- f_dose_observed(df, visitview, showplot = showplot)
     vf = observed$vf
+    treatment_by_drug_df = observed$treatment_by_drug_df
+
     dosing_summary_t = observed$dosing_summary_t %>%
       dplyr::mutate(pilevel = pilevel)
 
@@ -238,6 +240,9 @@ f_drug_demand <- function(
     drug_description_df <- dosing_summary_t0 %>%
       dplyr::select(.data$drug, .data$drug_name, .data$dose_unit)
   } else {
+    treatment_by_drug_df = f_treatment_by_drug_df(
+      treatment_by_drug, drug_name, dose_unit)
+
     dosing_summary_t0 = drug_description_df %>%
       dplyr::mutate(cum_dose_t0 = 0)
   }
@@ -247,8 +252,6 @@ f_drug_demand <- function(
   drug_name = drug_description_df$drug_name
   dose_unit = drug_description_df$dose_unit
 
-  treatment_by_drug_df <- f_treatment_by_drug_df(
-    treatment_by_drug, drug_name, dose_unit)
 
   # time points after cutoff to impute dosing data
   t0 = ifelse(is.null(df), 1, as.numeric(cutoffdt - trialsdt + 1))
