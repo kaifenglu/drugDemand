@@ -99,10 +99,9 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
   # observed probabilities
   s_t0_a <- survfit(Surv(time, status) ~ 1, data = df)
   y.obs = s_t0_a$time - 1
-  ymax = max(y.obs)
-  y = 0:ymax
-  p.obs = rep(0, ymax+1)
-  p.obs[y.obs+1] = -diff(c(1, s_t0_a$surv))
+  y = min(y.obs):max(y.obs)
+  p.obs = rep(0, length(y))
+  p.obs[findInterval(y.obs, y)] = -diff(c(1, s_t0_a$surv))
 
   # fit time-to-event models
   l = length(unique(df$time))
@@ -197,6 +196,7 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
     aictext = paste("AIC:", round(fit$aic,2))
     bictext = paste("BIC:", round(fit$bic,2))
   } else {
+    modeltext = ""
     aictext = ""
     bictext = ""
   }
@@ -308,10 +308,9 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
   x = table(df$skipped)
   count = as.numeric(x)
   y.obs = as.numeric(names(x))
-  ymax = max(y.obs)
-  y = 0:ymax
-  p.obs = rep(0, ymax+1)
-  p.obs[y.obs+1] = count/sum(count)
+  y = min(y.obs):max(y.obs)
+  p.obs = rep(0, length(y))
+  p.obs[findInterval(y.obs, y)] = count/sum(count)
 
   # fit the count model
   l = length(unique(df$skipped))
@@ -409,6 +408,7 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
     aictext = paste("AIC:", round(fit$aic,2))
     bictext = paste("BIC:", round(fit$bic,2))
   } else {
+    modeltext = ""
     aictext = ""
     bictext = ""
   }
@@ -507,17 +507,18 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 #' vf <- vf %>%
 #'   left_join(dosing_schedule_df, by = "drug")
 #'
-#' # time from randomization to the first drug dispensing visit
-#' df_k0 <- vf %>%
-#'   filter(row_id == 1) %>%
-#'   mutate(time = day,
-#'          skipped = floor((time - target_days/2)/target_days) + 1)
+#' vf1 <- vf %>%
+#'   group_by(usubjid, day) %>%
+#'   slice(n()) %>%
+#'   group_by(usubjid)
 #'
-#' df_t1 <- df_k0 %>%
-#'   filter(skipped > 0) %>%
-#'   mutate(k1 = skipped)
+#' df_ti <- vf %>%
+#'   mutate(time = lead(day) - day,
+#'          skipped = pmax(floor((time - target_days/2)/target_days), 0),
+#'          k1 = skipped + 1) %>%
+#'   filter(row_id < n())
 #'
-#' fit_t1 <- f_fit_ti(df_t1, model = "lm", nreps = 200)
+#' fit_ti <- f_fit_ti(df_ti, model = "lm", nreps = 200)
 #'
 #' @export
 f_fit_ti <- function(df, model = "lm", nreps, showplot = TRUE) {
@@ -540,10 +541,9 @@ f_fit_ti <- function(df, model = "lm", nreps, showplot = TRUE) {
   x = table(df$time)
   count = as.numeric(x)
   y.obs = as.numeric(names(x))
-  ymax = max(y.obs)
-  y = 1:ymax
-  p.obs = rep(0, ymax)
-  p.obs[y.obs] = count/sum(count)
+  y = min(y.obs):max(y.obs)
+  p.obs = rep(0, length(y))
+  p.obs[findInterval(y.obs, y)] = count/sum(count)
 
   p.fit <- purrr::map_vec(y, function(y) {
     mean(pnorm((y + 0.5 - fit$beta*df$k1)/fit$sigma) -
@@ -663,11 +663,9 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
   x = table(df$dose)
   count = as.numeric(x)
   y.obs = as.numeric(names(x))
-  ymax = max(y.obs)
-  y = 1:ymax
-  p.obs = rep(0, ymax)
-  p.obs[y.obs] = count/sum(count)
-
+  y = min(y.obs):max(y.obs)
+  p.obs = rep(0, length(y))
+  p.obs[findInterval(y.obs, y)] = count/sum(count)
 
   l = length(unique(df$dose))
   if (l == 1) {
@@ -772,6 +770,7 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
     aictext = paste("AIC:", round(fit$aic,2))
     bictext = paste("BIC:", round(fit$bic,2))
   } else {
+    modeltext = ""
     aictext = ""
     bictext = ""
   }
@@ -888,10 +887,12 @@ f_dispensing_models <- function(
     delta = target_days[1]
 
     # only keep one record per subject and drug dispensing day
+    # need to redefine row_id due to drug dispensing at unscheduled visits
     vf1 <- vf %>%
       dplyr::group_by(.data$usubjid, .data$day) %>%
       dplyr::slice(dplyr::n()) %>%
-      dplyr::group_by(.data$usubjid)
+      dplyr::group_by(.data$usubjid) %>%
+      dplyr::mutate(row_id = dplyr::row_number())
 
     # time from randomization to the first drug dispensing visit
     df_k0 <- vf1 %>%

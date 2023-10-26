@@ -205,7 +205,7 @@ f_dose_observed <- function(
   bar_t0_plot <- plotly::plot_ly(bar_t0_df, x = ~y, y = ~n, type = 'bar',
                             color = ~drug_name) %>%
     plotly::layout(
-      xaxis = list(title = paste('Time between randomization and',
+      xaxis = list(title = paste('Days between randomization and',
                                  'the first drug dispensing visit')),
       yaxis = list(title = 'Count'),
       barmode = 'group')
@@ -218,7 +218,7 @@ f_dose_observed <- function(
   bar_ti_plot <- plotly::plot_ly(bar_ti_df, x = ~y, y = ~n, type = 'bar',
                             color = ~drug_name) %>%
     plotly::layout(
-      xaxis = list(title = paste('Time between two consecutive',
+      xaxis = list(title = paste('Days between consecutive',
                                  'drug dispensing visits')),
       yaxis = list(title = 'Count'),
       barmode = 'group')
