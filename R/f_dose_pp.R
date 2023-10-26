@@ -2,10 +2,10 @@
 #' @description Obtains the cumulative dose given treatment duration and
 #' dosing schedule.
 #'
-#' @param x The treatment duration.
-#' @param w The number of days per treatment cycle for the drug.
-#' @param d The number of kits per treatment cycle for the drug.
-#' @param N The maximum number of treatment cycles for the drug.
+#' @param x Treatment duration.
+#' @param w Number of days per treatment cycle.
+#' @param d Dose per treatment cycle.
+#' @param N Maximum number of treatment cycles.
 #'
 #' @return The cumulative dose to dispense for the drug over a specified
 #' treatment duration.
@@ -49,7 +49,7 @@ f_cum_dose <- function(x, w, d, N) {
 #'   \code{dose_unit}.
 #' @param dosing_schedule_df A data frame providing dosing schedule
 #'   information. It contains the following variables: \code{drug},
-#'   \code{target_days}, \code{target_kits}, and \code{max_cycles}.
+#'   \code{target_days}, \code{target_dose}, and \code{max_cycles}.
 #' @param t0 The cutoff date relative to the trial start date.
 #' @param t A vector of new time points for drug dispensing predictions.
 #' @param pilevel The prediction interval level.
@@ -135,7 +135,7 @@ f_dose_pp <- function(dosing_summary_t0, newEvents,
   purrr::map_dfr(
     1:length(unique(treatment_by_drug_df$drug)), function(h) {
       w = dosing_schedule_df$target_days[dosing_schedule_df$drug == h]
-      d = dosing_schedule_df$target_kits[dosing_schedule_df$drug == h]
+      d = dosing_schedule_df$target_dose[dosing_schedule_df$drug == h]
       N = dosing_schedule_df$max_cycles[dosing_schedule_df$drug == h]
 
       # treatments associated with the drug

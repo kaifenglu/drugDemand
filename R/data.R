@@ -25,9 +25,9 @@
 #' A data frame with 4 rows and 4 columns:
 #' \describe{
 #'   \item{\code{drug}}{The numeric code of the drug.}
-#'   \item{\code{target_days}}{The target number of days per treatment cycle.}
-#'   \item{\code{target_kits}}{The target number of kits per treatment cycle.}
-#'   \item{\code{max_cycles}}{The maximum number of treatment cycles.}
+#'   \item{\code{target_days}}{Number of days per treatment cycle.}
+#'   \item{\code{target_dose}}{Dose per treatment cycle.}
+#'   \item{\code{max_cycles}}{Maximum number of treatment cycles.}
 #' }
 "dosing_schedule_df"
 

@@ -280,7 +280,7 @@ visitview1 <- visitview2 %>%
 dosing_schedule_df = dplyr::tibble(
   drug = c(1, 2, 3, 4),
   target_days = c(21, 21, 21, 21),
-  target_kits = c(2, 3, 2, 1),
+  target_dose = c(2, 3, 2, 1),
   max_cycles = c(10000, 10000, 10000, 10000))
 
 # save to data/ folder

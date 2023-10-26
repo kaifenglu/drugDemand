@@ -69,7 +69,7 @@ f_treatment_by_drug_df <- function(
 #'   combinations.
 #' @param dosing_schedule_df A data frame providing dosing schedule
 #'   information. It contains the following variables: \code{drug},
-#'   \code{target_days}, \code{target_kits}, and \code{max_cycles}.
+#'   \code{target_days}, \code{target_dose}, and \code{max_cycles}.
 #' @param model_k0 The model for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
 #' @param model_t0 The model for the gap time between randomization
