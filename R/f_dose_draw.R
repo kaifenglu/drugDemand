@@ -633,15 +633,15 @@ f_dose_draw_1 <- function(
 #' t1 = t0 + nyears*365
 #' t = c(seq(t0, t1, 30), t1)
 #'
-#' a <- f_dose_draw(
+#' dose_draw <- f_dose_draw(
 #'   df, vf, newEvents, treatment_by_drug_df,
 #'   fit$common_time_model,
 #'   fit$fit_k0, fit$fit_t0, fit$fit_t1,
 #'   fit$fit_ki, fit$fit_ti, fit$fit_di,
 #'   t0, t, ncores_max = 2)
 #'
-#' head(a$dosing_subject_new)
-#' head(a$dosing_summary_new)
+#' head(dose_draw$dosing_subject_new)
+#' head(dose_draw$dosing_summary_new)
 #' }
 #'
 #' @export

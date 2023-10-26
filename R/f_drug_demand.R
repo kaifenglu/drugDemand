@@ -172,7 +172,7 @@ f_treatment_by_drug_df <- function(
 #'
 #' tictoc::tic("drug demand prediction")
 #'
-#' a <- f_drug_demand(
+#' drug_demand <- f_drug_demand(
 #'   df = df2,
 #'   newEvents = pred$event_pred$newEvents,
 #'   visitview = visitview2,
@@ -189,7 +189,7 @@ f_treatment_by_drug_df <- function(
 #'
 #' tictoc::toc()
 #'
-#' a$dosing_pred_plot
+#' drug_demand$dosing_pred_plot
 #' }
 #'
 #' @export

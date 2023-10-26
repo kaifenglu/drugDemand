@@ -70,7 +70,7 @@ f_bar_chart <- function(x) {
 #' @examples
 #'
 #' \donttest{
-#' a <- f_dose_observed(df = df2, visitview = visitview2)
+#' dose_observed <- f_dose_observed(df = df2, visitview = visitview2)
 #' }
 #'
 #' @export
