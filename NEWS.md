@@ -14,6 +14,7 @@
 - plot gap time t0 instead of t0 + 1 in the f_fit_t0 function
 - plot the rounded value of di based on probability calculations alongside the observed value of di in the f_fit_di function
 - replace the residual plot with the fitted gap time bar chart in the f_fit_ti function
+- redefine row_id for vf1 if common_time_model is true in the f_dispensing_models function
 
 # drugDemand 0.1.0
 
