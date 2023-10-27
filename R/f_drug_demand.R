@@ -98,6 +98,10 @@ f_treatment_by_drug_df <- function(
 #' For analysis-stage drug demand forecasting, a list with the
 #' following components:
 #'
+#' * \code{trialsdt} The trial start date.
+#'
+#' * \code{cutoffdt} The cutoff date.
+#'
 #' * \code{dosing_summary_t0} A data frame for the cumulative doses
 #' dispensed before the cutoff date. It contains the following
 #' variables: drug, drug_name, dose_unit, and cum_dose_t0.
@@ -176,7 +180,6 @@ f_treatment_by_drug_df <- function(
 #'   df = df2,
 #'   newEvents = pred$event_pred$newEvents,
 #'   visitview = visitview2,
-#'   treatment_by_drug = treatment_by_drug,
 #'   dosing_schedule_df = dosing_schedule_df,
 #'   model_k0 = "zip",
 #'   model_t0 = "log-logistic",
@@ -312,7 +315,8 @@ f_drug_demand <- function(
       dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit,
                      .data$usubjid, .data$day) %>%
       dplyr::mutate(
-        trialsdt = trialsdt, cutoffdt = cutoffdt,
+        trialsdt = trialsdt,
+        cutoffdt = cutoffdt,
         randdt = as.Date(.data$arrivalTime - 1, origin = trialsdt),
         adt = as.Date(.data$time - 1, origin = .data$randdt),
         date = as.Date(.data$day - 1, origin = .data$randdt))
@@ -448,7 +452,9 @@ f_drug_demand <- function(
     list(dosing_pred_pp = dosing_pred_pp,
          dosing_pred_plot = fig)
   } else {
-    list(dosing_summary_t0 = observed$dosing_summary_t0,
+    list(trialsdt = trialsdt,
+         cutoffdt = cutoffdt,
+         dosing_summary_t0 = observed$dosing_summary_t0,
          cum_dispense_plot = observed$cum_dispense_plot,
          bar_t0_plot = observed$bar_t0_plot,
          bar_ti_plot = observed$bar_ti_plot,

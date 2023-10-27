@@ -17,6 +17,9 @@
 - redefine row_id for vf1 if common_time_model is true in the f_dispensing_models function
 - use df and visitview to derive treatment_by_drug_df for real-time drug demand forecasting
 - update the examples of the f_fit_t0, f_fit_ki, and f_fit_ti functions
+- add trialsdt and cutoffdt to the output of the f_dose_observed and f_drug_demand functions
+- move the arrange operation of dosing_subject_newi out of the f_dose_draw_1 function into the f_dose_draw function to improve efficiency
+- combine the two summarise operation of dosing_summary_newi in the f_dose_draw_1 function to improve efficiency
 
 # drugDemand 0.1.0
 

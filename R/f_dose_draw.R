@@ -1,5 +1,5 @@
-#' @title Drug Dispensing Visit Dates for One Iteration
-#' @description Obtains drug dispensing visit dates for one iteration.
+#' @title Drug Dispensing Visit Dates Simulation for One Iteration
+#' @description Simulates drug dispensing visit dates for one iteration.
 #'
 #' @param i The iteration number.
 #' @param fit_k0 The model fit for the number of skipped
@@ -62,10 +62,10 @@
 #'   by_treatment = TRUE)
 #' newEvents <- pred$event_pred$newEvents
 #'
-#' drug_name = drug_description_df$drug_name
-#' dose_unit = drug_description_df$dose_unit
-#' treatment_by_drug_df <- f_treatment_by_drug_df(
-#'   treatment_by_drug, drug_name, dose_unit)
+#' treatment_by_drug_df <- vf %>%
+#'   group_by(treatment, drug, drug_name, dose_unit) %>%
+#'   slice(n()) %>%
+#'   select(treatment, drug, drug_name, dose_unit)
 #'
 #' fit <- f_dispensing_models(
 #'   target_days = dosing_schedule_df$target_days, vf,
@@ -98,17 +98,20 @@
 #'   select(drug, drug_name, dose_unit, usubjid, day, dose)
 #'
 #' # replicate for nreps times
-#' vf1_rep = tibble(draw = 1:nreps) %>% cross_join(vf1)
+#' vf1_rep = tibble(draw = 1:nreps) %>%
+#'   cross_join(vf1)
 #'
 #' df1 <- newEvents %>%
-#'   filter(usubjid %in% unames1) %>% select(-c(event, dropout))
+#'   filter(usubjid %in% unames1) %>%
+#'   select(-c(event, dropout))
 #'
 #' vf_ongoing <- vf1_rep %>%
 #'   inner_join(df1, by = c("draw", "usubjid"))
 #'
 #' ### new patients and ongoing patients with no dosing records ###
 #' df_new <- newEvents %>%
-#'   filter(arrivalTime > t0 | usubjid %in% setdiff(unames1, unames2))
+#'   filter(arrivalTime > t0 |
+#'            usubjid %in% setdiff(unames1, unames2))
 #'
 #' vf_new <- purrr::map_dfr(
 #'   1:l, function(h) {
@@ -120,7 +123,8 @@
 #'
 #' # only keep the last record for each patient in each draw
 #' vf_ongoing1 <- vf_ongoing %>%
-#'   group_by(draw, usubjid) %>% slice(n()) %>%
+#'   group_by(draw, usubjid) %>%
+#'   slice(n()) %>%
 #'   mutate(V = day - 1,
 #'          C = as.numeric(t0 - arrivalTime),
 #'          D = pmin(time - 1, t1 - arrivalTime)) %>%
@@ -128,7 +132,8 @@
 #'
 #' ### new patients and ongoing patients with no dosing records ###
 #' vf_new1 <- vf_new %>%
-#'   group_by(draw, usubjid) %>% slice(n()) %>%
+#'   group_by(draw, usubjid) %>%
+#'   slice(n()) %>%
 #'   mutate(V = 0,
 #'          C = as.numeric(t0 - arrivalTime),
 #'          D = pmin(time - 1, t1 - arrivalTime)) %>%
@@ -136,7 +141,8 @@
 #'
 #' dosing_subject_new1 <- f_dose_draw_t_1(
 #'   1, fit$fit_k0, fit$fit_t0, fit$fit_t1,
-#'   fit$fit_ki, fit$fit_ti, vf_ongoing1, vf_new1)
+#'   fit$fit_ki, fit$fit_ti,
+#'   vf_ongoing1, vf_new1)
 #'
 #' head(dosing_subject_new1)
 #' }
@@ -204,7 +210,8 @@ f_dose_draw_t_1 <- function(
   sigmaT = fit_ti$theta[i,2]
 
   # impute dosing for ongoing patients
-  df_ongoing1 <- vf_ongoing1 %>% dplyr::filter(.data$draw == i)
+  df_ongoing1 <- vf_ongoing1 %>%
+    dplyr::filter(.data$draw == i)
 
   # impute dosing dates for these ongoing patients
   df_ongoingi <- f_dose_ongoing_cpp(
@@ -220,7 +227,8 @@ f_dose_draw_t_1 <- function(
   # impute dosing for new patients
   if (!is.null(vf_new1)) {
     # dosing data for new patients in draw i
-    df_new1 <- vf_new1 %>% dplyr::filter(.data$draw == i)
+    df_new1 <- vf_new1 %>%
+      dplyr::filter(.data$draw == i)
 
     # impute dosing data for new patients
     df_newi <- f_dose_new_cpp(
@@ -248,8 +256,8 @@ f_dose_draw_t_1 <- function(
 
 
 
-#' @title Drug Dispensing Data for One Iteration
-#' @description Obtains drug dispensing data for one iteration.
+#' @title Drug Dispensing Data Simulation for One Iteration
+#' @description Simulates drug dispensing data for one iteration.
 #'
 #' @param i The iteration number.
 #' @param common_time_model A Boolean variable that indicates whether
@@ -278,7 +286,7 @@ f_dose_draw_t_1 <- function(
 #'   associated with each drug, including the following variables:
 #'   \code{treatment}, \code{drug}, \code{drug_name}, and
 #'   \code{dose_unit}.
-#' @param t A vector of new time points for drug dispensing predictions.
+#' @param t A vector of new time points for drug dispensing prediction.
 #'
 #' @return A list of two components:
 #'
@@ -328,10 +336,10 @@ f_dose_draw_t_1 <- function(
 #'   by_treatment = TRUE)
 #' newEvents <- pred$event_pred$newEvents
 #'
-#' drug_name = drug_description_df$drug_name
-#' dose_unit = drug_description_df$dose_unit
-#' treatment_by_drug_df <- f_treatment_by_drug_df(
-#'   treatment_by_drug, drug_name, dose_unit)
+#' treatment_by_drug_df <- vf %>%
+#'   group_by(treatment, drug, drug_name, dose_unit) %>%
+#'   slice(n()) %>%
+#'   select(treatment, drug, drug_name, dose_unit)
 #'
 #' fit <- f_dispensing_models(
 #'   target_days = dosing_schedule_df$target_days, vf,
@@ -364,17 +372,20 @@ f_dose_draw_t_1 <- function(
 #'   select(drug, drug_name, dose_unit, usubjid, day, dose)
 #'
 #' # replicate for nreps times
-#' vf1_rep = tibble(draw = 1:nreps) %>% cross_join(vf1)
+#' vf1_rep = tibble(draw = 1:nreps) %>%
+#'   cross_join(vf1)
 #'
 #' df1 <- newEvents %>%
-#'   filter(usubjid %in% unames1) %>% select(-c(event, dropout))
+#'   filter(usubjid %in% unames1) %>%
+#'   select(-c(event, dropout))
 #'
 #' vf_ongoing <- vf1_rep %>%
 #'   inner_join(df1, by = c("draw", "usubjid"))
 #'
 #' ### new patients and ongoing patients with no dosing records ###
 #' df_new <- newEvents %>%
-#'   filter(arrivalTime > t0 | usubjid %in% setdiff(unames1, unames2))
+#'   filter(arrivalTime > t0 |
+#'            usubjid %in% setdiff(unames1, unames2))
 #'
 #' vf_new <- purrr::map_dfr(
 #'   1:l, function(h) {
@@ -386,7 +397,8 @@ f_dose_draw_t_1 <- function(
 #'
 #' # only keep the last record for each patient in each draw
 #' vf_ongoing1 <- vf_ongoing %>%
-#'   group_by(draw, usubjid) %>% slice(n()) %>%
+#'   group_by(draw, usubjid) %>%
+#'   slice(n()) %>%
 #'   mutate(V = day - 1,
 #'          C = as.numeric(t0 - arrivalTime),
 #'          D = pmin(time - 1, t1 - arrivalTime)) %>%
@@ -394,7 +406,8 @@ f_dose_draw_t_1 <- function(
 #'
 #' ### new patients and ongoing patients with no dosing records ###
 #' vf_new1 <- vf_new %>%
-#'   group_by(draw, usubjid) %>% slice(n()) %>%
+#'   group_by(draw, usubjid) %>%
+#'   slice(n()) %>%
 #'   mutate(V = 0,
 #'          C = as.numeric(t0 - arrivalTime),
 #'          D = pmin(time - 1, t1 - arrivalTime)) %>%
@@ -481,7 +494,8 @@ f_dose_draw_1 <- function(
       if (n_new == 0) {
         df_all <- df_ongoing2
       } else {
-        df_all <- df_ongoing2 %>% dplyr::bind_rows(df_new2)
+        df_all <- df_ongoing2 %>%
+          dplyr::bind_rows(df_new2)
       }
 
       df_all
@@ -491,19 +505,15 @@ f_dose_draw_1 <- function(
   # add observed drug dispensing data
   dosing_subject_newi <- vf_ongoing %>%
     dplyr::filter(.data$draw == i) %>%
-    dplyr::bind_rows(dosing_subject_new3) %>%
-    dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit,
-                   .data$draw, .data$usubjid, .data$day)
+    dplyr::bind_rows(dosing_subject_new3)
 
   # drug dispensed for ongoing and new subjects by drug, t, and draw
   dosing_summary_newi <- dplyr::tibble(t = t) %>%
     dplyr::cross_join(dosing_subject_newi) %>%
     dplyr::filter(.data$arrivalTime + .data$day - 1 <= .data$t) %>%
     dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                    .data$t, .data$draw, .data$usubjid) %>%
-    dplyr::summarise(cum_dose = sum(.data$dose),
-                     .groups = "drop_last") %>%
-    dplyr::summarise(total_dose_b = sum(.data$cum_dose),
+                    .data$t, .data$draw) %>%
+    dplyr::summarise(total_dose_b = sum(.data$dose),
                      .groups = "drop_last")
 
   # output drug dispensing data at the subject and summary levels
@@ -554,7 +564,7 @@ f_dose_draw_1 <- function(
 #' @param fit_di The model fit for the dispensed doses at drug
 #'   dispensing visits.
 #' @param t0 The cutoff date relative to the trial start date.
-#' @param t A vector of new time points for drug dispensing predictions.
+#' @param t A vector of new time points for drug dispensing prediction.
 #' @param ncores_max The maximum number of cores to use for parallel
 #'   computing. The actual number of cores used is the minimum of
 #'   \code{ncores_max} and half of the detected number of cores.
@@ -615,10 +625,10 @@ f_dose_draw_1 <- function(
 #'   by_treatment = TRUE)
 #' newEvents <- pred$event_pred$newEvents
 #'
-#' drug_name = drug_description_df$drug_name
-#' dose_unit = drug_description_df$dose_unit
-#' treatment_by_drug_df <- f_treatment_by_drug_df(
-#'   treatment_by_drug, drug_name, dose_unit)
+#' treatment_by_drug_df <- vf %>%
+#'   group_by(treatment, drug, drug_name, dose_unit) %>%
+#'   slice(n()) %>%
+#'   select(treatment, drug, drug_name, dose_unit)
 #'
 #' fit <- f_dispensing_models(
 #'   target_days = dosing_schedule_df$target_days, vf,
@@ -674,7 +684,8 @@ f_dose_draw <- function(
                   .data$usubjid, .data$day, .data$dose)
 
   # replicate for nreps times
-  vf1_rep = dplyr::tibble(draw = 1:nreps) %>% dplyr::cross_join(vf1)
+  vf1_rep = dplyr::tibble(draw = 1:nreps) %>%
+    dplyr::cross_join(vf1)
 
   df1 <- newEvents %>%
     dplyr::filter(.data$usubjid %in% unames1) %>%
@@ -756,7 +767,9 @@ f_dose_draw <- function(
     vf_ongoing, vf_ongoing1, vf_new1,
     treatment_by_drug_df, t)
 
-  dosing_subject_new <- list1$dosing_subject_newi
+  dosing_subject_new <- list1$dosing_subject_newi %>%
+    dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit,
+                   .data$draw, .data$usubjid, .data$day)
 
 
   # register parallel backend

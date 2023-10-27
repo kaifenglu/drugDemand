@@ -34,6 +34,10 @@ f_bar_chart <- function(x) {
 #'
 #' @return A list with the following components:
 #'
+#' * \code{trialsdt} The trial start date.
+#'
+#' * \code{cutoffdt} The cutoff date.
+#'
 #' * \code{vf} A data frame for subject-level drug dispensing data,
 #' including the following variables: \code{drug}, \code{drug_name},
 #' \code{dose_unit}, \code{usubjid}, \code{treatment},
@@ -85,6 +89,7 @@ f_dose_observed <- function(
     showplot = TRUE) {
 
   trialsdt = df$trialsdt[1]
+  cutoffdt = df$cutoffdt[1]
 
   df <- df %>%
     dplyr::mutate(arrivalTime = as.numeric(
@@ -254,7 +259,9 @@ f_dose_observed <- function(
     print(bar_di_plot)
   }
 
-  list(vf = vf,
+  list(trialsdt = trialsdt,
+       cutoffdt = cutoffdt,
+       vf = vf,
        treatment_by_drug_df = treatment_by_drug_df,
        dosing_summary_t = dosing_summary_t,
        dosing_summary_t0 = dosing_summary_t0,

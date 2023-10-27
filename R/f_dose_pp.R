@@ -51,7 +51,7 @@ f_cum_dose <- function(x, w, d, N) {
 #'   information. It contains the following variables: \code{drug},
 #'   \code{target_days}, \code{target_dose}, and \code{max_cycles}.
 #' @param t0 The cutoff date relative to the trial start date.
-#' @param t A vector of new time points for drug dispensing predictions.
+#' @param t A vector of new time points for drug dispensing prediction.
 #' @param pilevel The prediction interval level.
 #'
 #' @return A data frame for dosing summary by drug and time point per
@@ -65,7 +65,7 @@ f_cum_dose <- function(x, w, d, N) {
 #' @examples
 #'
 #' \donttest{
-#' # Design stage drug demand predictions per protocol.
+#' # Design stage drug demand forecasting per protocol.
 #'
 #' set.seed(312)
 #' library(dplyr)

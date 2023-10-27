@@ -1,4 +1,4 @@
-#' @title Model Fit for Dispensing Delay After Randomization
+#' @title Model Fitting for Dispensing Delay After Randomization
 #' @description Fits a specified time-to-event model to the gap time
 #' between randomization and the first drug dispensing visit when
 #' there is no visit skipping.
@@ -232,7 +232,7 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 }
 
 
-#' @title Fit for Number of Skipped Visits
+#' @title Model Fitting for Number of Skipped Visits
 #' @description Fits a count model to the number of skipped visits.
 #'
 #' @param df The subject-level dosing data, including \code{skipped} to
@@ -449,7 +449,7 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 }
 
 
-#' @title Model Fit for Gap Times
+#' @title Model Fitting for Gap Times
 #' @description Fits a linear regression model to the gap times.
 #'
 #' @param df The subject-level dosing data, including the following
@@ -596,7 +596,7 @@ f_fit_ti <- function(df, model = "lm", nreps, showplot = TRUE) {
 }
 
 
-#' @title Model Fit for Dispensed Doses
+#' @title Model Fitting for Dispensed Doses
 #' @description Fits a linear mixed-effects model to the dispensed doses.
 #'
 #' @param df The subject-level dosing data, including \code{usubjid},
@@ -718,7 +718,7 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
       gf = dplyr::tibble(y = y, p.obs = p.obs, p.fit = p.fit)
 
       # draw sigmae and then mud given sigmae from posterior
-      b2 = sqrt(a$df.residual*fit$sigmae^2/rchisq(nreps, a$df.residual))
+      b2 = sqrt(a$df.residual * fit$sigmae^2 / rchisq(nreps, a$df.residual))
       b1 = fit$mud + rnorm(nreps)*sqrt(fit$vmud)/fit$sigmae*b2
       theta_fix = matrix(c(b1, rep(0, nreps), b2), nreps, 3)
       theta_ran = matrix(0, nreps, N)
@@ -792,7 +792,7 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
                          name = 'Observed')
   fig <- fig %>% plotly::add_trace(y = ~p.fit, name = 'Fitted')
   fig <- fig %>% plotly::layout(
-    xaxis = list(title = 'Doses dispensed at drug dispensing visits'),
+    xaxis = list(title = 'Dose dispensed at drug dispensing visits'),
     yaxis = list(title = 'Proportion'),
     barmode = 'group')
 
@@ -810,7 +810,7 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
 }
 
 
-#' @title Drug Dispensing Model Fit
+#' @title Drug Dispensing Model Fitting
 #' @description Fits drug dispensing models to the observed drug
 #' dispensing data.
 #'
