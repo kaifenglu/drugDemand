@@ -16,6 +16,7 @@
 - replace the residual plot with the fitted gap time bar chart in the f_fit_ti function
 - redefine row_id for vf1 if common_time_model is true in the f_dispensing_models function
 - use df and visitview to derive treatment_by_drug_df for real-time drug demand forecasting
+- update the examples of the f_fit_t0, f_fit_ki, and f_fit_ti functions
 
 # drugDemand 0.1.0
 
