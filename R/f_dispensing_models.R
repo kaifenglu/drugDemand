@@ -71,8 +71,14 @@
 #' vf <- vf %>%
 #'   left_join(dosing_schedule_df, by = "drug")
 #'
+#' vf1 <- vf %>%
+#'   group_by(usubjid, day) %>%
+#'   slice(n()) %>%
+#'   group_by(usubjid) %>%
+#'   mutate(row_id = row_number())
+#'
 #' # time from randomization to the first drug dispensing visit
-#' df_k0 <- vf %>%
+#' df_k0 <- vf1 %>%
 #'   filter(row_id == 1) %>%
 #'   mutate(time = day,
 #'          skipped = floor((time - target_days/2)/target_days) + 1)
@@ -284,13 +290,19 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 #' vf <- vf %>%
 #'   left_join(dosing_schedule_df, by = "drug")
 #'
-#' # time from randomization to the first drug dispensing visit
-#' df_k0 <- vf %>%
-#'   filter(row_id == 1) %>%
-#'   mutate(time = day,
-#'          skipped = floor((time - target_days/2)/target_days) + 1)
+#' vf1 <- vf %>%
+#'   group_by(usubjid, day) %>%
+#'   slice(n()) %>%
+#'   group_by(usubjid) %>%
+#'   mutate(row_id = row_number())
 #'
-#' fit_k0 <- f_fit_ki(df_k0, model = "zip", nreps = 200)
+#' df_ti <- vf1 %>%
+#'   mutate(time = lead(day) - day,
+#'          skipped = pmax(floor((time - target_days/2)/target_days), 0),
+#'          k1 = skipped + 1) %>%
+#'   filter(row_id < n())
+#'
+#' fit_ki <- f_fit_ki(df_ti, model = "zip", nreps = 200)
 #'
 #' @export
 f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
@@ -510,9 +522,10 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 #' vf1 <- vf %>%
 #'   group_by(usubjid, day) %>%
 #'   slice(n()) %>%
-#'   group_by(usubjid)
+#'   group_by(usubjid) %>%
+#'   mutate(row_id = row_number())
 #'
-#' df_ti <- vf %>%
+#' df_ti <- vf1 %>%
 #'   mutate(time = lead(day) - day,
 #'          skipped = pmax(floor((time - target_days/2)/target_days), 0),
 #'          k1 = skipped + 1) %>%
@@ -868,13 +881,13 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
 #'   group_by(drug, drug_name, dose_unit, usubjid) %>%
 #'   mutate(row_id = row_number())
 #'
-#' fit <- f_dispensing_models(
+#' dispensing_models <- f_dispensing_models(
 #'   target_days = dosing_schedule_df$target_days, vf,
 #'   model_k0 = "zip", model_t0 = "log-logistic",
 #'   model_ki = "zip", model_di = "lme",
 #'   nreps = 200, showplot = FALSE)
 #'
-#' fit$fit_ki$fit_plot
+#' dispensing_models$fit_ki$fit_plot
 #
 #' @export
 f_dispensing_models <- function(

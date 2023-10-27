@@ -240,9 +240,6 @@ f_drug_demand <- function(
     drug_description_df <- dosing_summary_t0 %>%
       dplyr::select(.data$drug, .data$drug_name, .data$dose_unit)
   } else {
-    treatment_by_drug_df = f_treatment_by_drug_df(
-      treatment_by_drug, drug_name, dose_unit)
-
     dosing_summary_t0 = drug_description_df %>%
       dplyr::mutate(cum_dose_t0 = 0)
   }
@@ -252,6 +249,10 @@ f_drug_demand <- function(
   drug_name = drug_description_df$drug_name
   dose_unit = drug_description_df$dose_unit
 
+  if (is.null(visitview)) {
+    treatment_by_drug_df = f_treatment_by_drug_df(
+      treatment_by_drug, drug_name, dose_unit)
+  }
 
   # time points after cutoff to impute dosing data
   t0 = ifelse(is.null(df), 1, as.numeric(cutoffdt - trialsdt + 1))
@@ -264,7 +265,7 @@ f_drug_demand <- function(
                               t0, t, pilevel)
 
   # dosing prediction based on modeling and simulation
-  if (!is.null(vf)) {
+  if (!is.null(visitview)) {
     # add date information for prediction per protocol
     dosing_pred_pp <- dosing_pred_pp %>%
       dplyr::mutate(date = as.Date(.data$t - 1, origin = trialsdt))
