@@ -173,17 +173,13 @@ f_dose_observed <- function(
     dplyr::mutate(date = as.Date(.data$t - 1, origin = trialsdt))
 
   cum_dispense_plot <- plotly::plot_ly(
-      ad, x = ~date, y = ~n, color = ~drug_name,
-      linetype = ~drug_name) %>%
+    ad, x = ~date, y = ~n, color = ~drug_name, colors = "Set2") %>%
     plotly::add_lines(line = list(shape = "hv", width = 2)) %>%
     plotly::layout(
       xaxis = list(title = ""),
       yaxis = list(title = paste0("Doses dispensed ",
                                   "(", ad$dose_unit[1], ")"),
-                   zeroline = FALSE),
-      legend = list(x = 0, y = 1.05, yanchor = "bottom",
-                    orientation = 'h'))
-
+                   zeroline = FALSE))
 
   bar_t0_df <- bar_ti_df <- bar_di_df <- dplyr::tibble()
   for (h in 1:nrow(drug_description_df)) {
@@ -218,8 +214,9 @@ f_dose_observed <- function(
   bar_t0_df <- bar_t0_df %>%
     dplyr::left_join(drug_description_df, by = "drug")
 
-  bar_t0_plot <- plotly::plot_ly(bar_t0_df, x = ~y, y = ~n, type = 'bar',
-                            color = ~drug_name) %>%
+  bar_t0_plot <- plotly::plot_ly(
+    bar_t0_df, x = ~y, y = ~n, type = 'bar',
+    color = ~drug_name, colors = "Set2") %>%
     plotly::layout(
       xaxis = list(title = paste('Days between randomization and',
                                  'the first drug dispensing visit')),
@@ -231,8 +228,9 @@ f_dose_observed <- function(
   bar_ti_df <- bar_ti_df %>%
     dplyr::left_join(drug_description_df, by = "drug")
 
-  bar_ti_plot <- plotly::plot_ly(bar_ti_df, x = ~y, y = ~n, type = 'bar',
-                            color = ~drug_name) %>%
+  bar_ti_plot <- plotly::plot_ly(
+    bar_ti_df, x = ~y, y = ~n, type = 'bar',
+    color = ~drug_name, colors = "Set2") %>%
     plotly::layout(
       xaxis = list(title = paste('Days between consecutive',
                                  'drug dispensing visits')),
@@ -244,8 +242,9 @@ f_dose_observed <- function(
   bar_di_df <- bar_di_df %>%
     dplyr::left_join(drug_description_df, by = "drug")
 
-  bar_di_plot <- plotly::plot_ly(bar_di_df, x = ~y, y = ~n, type = 'bar',
-                            color = ~drug_name) %>%
+  bar_di_plot <- plotly::plot_ly(
+    bar_di_df, x = ~y, y = ~n, type = 'bar',
+    color = ~drug_name, colors = "Set2") %>%
     plotly::layout(
       xaxis = list(title = paste('Doses dispensed at',
                                  'drug dispensing visits')),
@@ -254,6 +253,7 @@ f_dose_observed <- function(
 
 
   if (showplot) {
+    print(cum_dispense_plot)
     print(bar_t0_plot)
     print(bar_ti_plot)
     print(bar_di_plot)

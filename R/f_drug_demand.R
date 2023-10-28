@@ -381,8 +381,6 @@ f_drug_demand <- function(
           yaxis = list(title = paste0("Doses to dispense ",
                                       "(", dfb_pp$dose_unit[1], ")"),
                        zeroline = FALSE),
-          legend = list(x = 0, y = 1.05, yanchor = "bottom",
-                        orientation = 'h'),
           annotations = list(
             x = 0.5, y = 1,
             text = paste0("<b>", dfb_pp$drug_name[1], "</b>"),
@@ -425,8 +423,6 @@ f_drug_demand <- function(
           yaxis = list(title = paste0("Doses to dispense ",
                                       "(", dfb_pp$dose_unit[1], ")"),
                        zeroline = FALSE),
-          legend = list(x = 0, y = 1.05, yanchor = "bottom",
-                        orientation = 'h'),
           annotations = list(
             x = 0.5, y = 1,
             text = paste0("<b>", dfb_pp$drug_name[1], "</b>"),

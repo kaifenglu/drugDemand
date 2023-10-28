@@ -20,6 +20,11 @@
 - add trialsdt and cutoffdt to the output of the f_dose_observed and f_drug_demand functions
 - move the arrange operation of dosing_subject_newi out of the f_dose_draw_1 function into the f_dose_draw function to improve efficiency
 - combine the two summarise operation of dosing_summary_newi in the f_dose_draw_1 function to improve efficiency
+- replace the zero-inflated negative binomial distribution with the negative binomial distribution in the f_fit_ki function to avoid convergence issues
+- print cum_dispense_plot if showplot is TRUE in the f_dose_observed function
+- add colors = "Set2" to cum_dispense_plot, bar_t0_plot, bar_ti_plot, and bar_di_plot in the f_dose_observed function
+- remove the custom legend of cum_dispense_plot in the f_dose_observed and f_drug_demand functions
+
 
 # drugDemand 0.1.0
 

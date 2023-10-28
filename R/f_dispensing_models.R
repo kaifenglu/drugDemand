@@ -240,7 +240,7 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 #' @param model The count model used to analyze the number of
 #'   skipped visits, with options including
 #'   "constant", "poisson", "zip" for zero-inflated Poisson, and
-#'   "zinb" for zero-inflated negative binomial.
+#'   "nb" for negative binomial.
 #' @param nreps The number of simulations for drawing posterior model
 #'   parameter values.
 #' @param showplot A Boolean variable that controls whether or not to
@@ -311,7 +311,7 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
   n = nrow(df)
 
   model = tolower(model)
-  erify::check_content(model, c("constant", "poisson", "zip", "zinb"))
+  erify::check_content(model, c("constant", "poisson", "zip", "nb"))
 
   erify::check_n(nreps)
   erify::check_bool(showplot)
@@ -370,42 +370,21 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
                  (1-pi)*dpois(y[-1], lambda))
 
       post = mvtnorm::rmvnorm(nreps, mean = fit$theta, sigma = fit$vtheta)
-    } else if (model == "zinb") {
-      a <- pscl::zeroinfl(skipped ~ 1 | 1, data = df, dist = "negbin")
+    } else if (model == "nb") {
+      a <- MASS::glm.nb(skipped ~ 1, data = df)
 
-      # negative log-likelihood for zero-inflated negative binomial
-      nllik <- function(theta, y) {
-        mu = exp(theta[1])
-        size = exp(theta[2])
-        prob = size/(size + mu)
-        pi = plogis(theta[3])
+      # parametrization: log(mean), log(size)
+      fit <- list(model = "nb",
+                  theta = c(as.numeric(a$coefficients), log(a$theta)),
+                  vtheta = diag(c(as.numeric(vcov(a)),
+                                  a$SE.theta^2/a$theta^2)),
+                  aic = a$aic,
+                  bic = -a$twologlik + 2*log(n))
 
-        t1 = sum(y == 0) * log(pi + (1-pi)*dnbinom(0, size, prob))
-        t2 = sum((y > 0) * log((1-pi)*dnbinom(y, size, prob)))
-        -(t1 + t2)
-      }
-
-      # parametrization: (log(mu), log(size), logit(pi))
-      theta = as.numeric(c(a$coefficients$count, log(a$theta),
-                           a$coefficients$zero))
-
-      # manually obtain the variance matrix as pscl::zeroinfl does not
-      # provide covariance between log(size) and (log(mu), logit(pi))
-      vtheta = solve(optimHess(theta, nllik, gr = NULL, df$skipped))
-
-      fit <- list(model = "zinb",
-                  theta = theta,
-                  vtheta = vtheta,
-                  aic = -2*a$loglik + 6,
-                  bic = -2*a$loglik + 3*log(n))
-
-      mu = exp(theta[1])
-      size = exp(theta[2])
+      mu = exp(fit$theta[1])
+      size = exp(fit$theta[2])
       prob = size/(size + mu)
-      pi = plogis(theta[3])
-
-      p.fit <- c(pi + (1-pi)*dnbinom(0, size, prob),
-                 (1-pi)*dnbinom(y[-1], size, prob))
+      p.fit = dnbinom(y, size, prob)
 
       post = mvtnorm::rmvnorm(nreps, mean = fit$theta, sigma = fit$vtheta)
     } else {

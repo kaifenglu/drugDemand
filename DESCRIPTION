@@ -6,7 +6,7 @@ Date: 2023-10-27
 Authors@R: 
     person("Kaifeng", "Lu", , "kaifenglu@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-6160-7119"))
-Description: Performs drug demand forecasting by modeling drug dispensing data while taking into account predicted enrollment and treatment discontinuation dates. The gap time between randomization and the first drug dispensing visit is modeled using interval-censored exponential, Weibull, log-logistic, or log-normal distributions (Anderson-Bergman (2017) <doi:10.18637/jss.v081.i12>). The number of skipped visits is modeled using zero-inflated Poisson or zero-inflated negative binomial distributions (Zeileis, Kleiber & Jackman (2008) <doi:10.18637/jss.v027.i08>). The gap time between two consecutive drug dispensing visis is modeled using linear regression given the number of skipped visits. The number of dispensed doses is modeled using a linear mixed-effects model (McCulloch & Searle (2001, ISBN:0-471-19364-X)).
+Description: Performs drug demand forecasting by modeling drug dispensing data while taking into account predicted enrollment and treatment discontinuation dates. The gap time between randomization and the first drug dispensing visit is modeled using interval-censored exponential, Weibull, log-logistic, or log-normal distributions (Anderson-Bergman (2017) <doi:10.18637/jss.v081.i12>). The number of skipped visits is modeled using Poisson, zero-inflated Poisson, or negative binomial distributions (Zeileis, Kleiber & Jackman (2008) <doi:10.18637/jss.v027.i08>). The gap time between two consecutive drug dispensing visis is modeled using linear regression given the number of skipped visits. The number of dispensed doses is modeled using a linear mixed-effects model (McCulloch & Searle (2001, ISBN:0-471-19364-X)).
 License: GPL (>= 2)
 Imports: 
     Rcpp (>= 1.0.10),
@@ -20,6 +20,7 @@ Imports:
     stats (>= 3.5.0),
     icenReg (>= 2.0.15),
     pscl (>= 1.5.5),
+    MASS (>= 7.3-54),
     nlme (>= 3.1-153),
     eventPred (>= 0.2.0),
     parallel (>= 4.1.2),

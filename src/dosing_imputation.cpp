@@ -69,13 +69,8 @@ DataFrame f_dose_ongoing_cpp(const StringVector usubjid,
       } else {
         ki = R::rpois(theta_ki(1));
       }
-    } else if (model_ki == "zinb") {
-      z = R::rbinom(1, theta_ki(0));
-      if (z == 1) {
-        ki = 0; // extra zeros
-      } else {
-        ki = R::rnbinom(theta_ki(1), theta_ki(2));
-      }
+    } else if (model_ki == "nb") {
+      ki = R::rnbinom(theta_ki(0), theta_ki(1));
     } else {
       ki = 0;
       stop("incorrect model for ki");
@@ -105,13 +100,8 @@ DataFrame f_dose_ongoing_cpp(const StringVector usubjid,
         } else {
           ki = R::rpois(theta_ki(1));
         }
-      } else if (model_ki == "zinb") {
-        z = R::rbinom(1, theta_ki(0));
-        if (z == 1) {
-          ki = 0; // extra zeros
-        } else {
-          ki = R::rnbinom(theta_ki(1), theta_ki(2));
-        }
+      } else if (model_ki == "nb") {
+        ki = R::rnbinom(theta_ki(0), theta_ki(1));
       } else {
         ki = 0;
         stop("incorrect model for ki");
@@ -223,13 +213,8 @@ DataFrame f_dose_new_cpp(const StringVector usubjid,
       } else {
         ki = R::rpois(theta_k0(1));
       }
-    } else if (model_k0 == "zinb") {
-      z = R::rbinom(1, theta_k0(0));
-      if (z == 1) {
-        ki = 0; // extra zeros
-      } else {
-        ki = R::rnbinom(theta_k0(1), theta_k0(2));
-      }
+    } else if (model_k0 == "nb") {
+      ki = R::rnbinom(theta_k0(0), theta_k0(1));
     } else {
       ki = 0;
       stop("incorrect model for k0");
@@ -319,13 +304,8 @@ DataFrame f_dose_new_cpp(const StringVector usubjid,
         } else {
           ki = R::rpois(theta_ki(1));
         }
-      } else if (model_ki == "zinb") {
-        z = R::rbinom(1, theta_ki(0));
-        if (z == 1) {
-          ki = 0; // extra zeros
-        } else {
-          ki = R::rnbinom(theta_ki(1), theta_ki(2));
-        }
+      } else if (model_ki == "nb") {
+        ki = R::rnbinom(theta_ki(0), theta_ki(1));
       } else {
         ki = 0;
         stop("incorrect model for ki");

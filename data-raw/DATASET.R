@@ -1,4 +1,4 @@
-library(magrittr)
+library(dplyr)
 library(purrr)
 
 set.seed(123)

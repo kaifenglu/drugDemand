@@ -161,13 +161,11 @@ f_dose_draw_t_1 <- function(
   } else if (model_k0 == "zip") {
     theta_k0 = c(pi = plogis(fit_k0$theta[i,2]),
                  lambda = exp(fit_k0$theta[i,1]))
-  } else if (model_k0 == "zinb") {
+  } else if (model_k0 == "nb") {
     mu = exp(fit_k0$theta[i,1])
     size = exp(fit_k0$theta[i,2])
     prob = size/(size + mu)
-    theta_k0 = c(pi = plogis(fit_k0$theta[i,3]),
-                 size = size,
-                 prob = prob)
+    theta_k0 = c(size = size, prob = prob)
   }
 
   model_t0 = fit_t0$fit$model
@@ -197,13 +195,11 @@ f_dose_draw_t_1 <- function(
   } else if (model_ki == "zip") {
     theta_ki = c(pi = plogis(fit_ki$theta[i,2]),
                  lambda = exp(fit_ki$theta[i,1]))
-  } else if (model_ki == "zinb") {
+  } else if (model_ki == "nb") {
     mu = exp(fit_ki$theta[i,1])
     size = exp(fit_ki$theta[i,2])
     prob = size/(size + mu)
-    theta_ki = c(pi = plogis(fit_ki$theta[i,3]),
-                 size = size,
-                 prob = prob)
+    theta_ki = c(size = size, prob = prob)
   }
 
   muT = fit_ti$theta[i,1]

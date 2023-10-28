@@ -11,8 +11,8 @@
 #' using interval-censored exponential, Weibull, log-logistic, or
 #' log-normal distributions
 #' (Anderson-Bergman (2017) <doi:10.18637/jss.v081.i12>).
-#' The number of skipped visits is modeled using zero-inflated
-#' Poisson or zero-inflated negative binomial distributions
+#' The number of skipped visits is modeled using Poisson,
+#' zero-inflated Poisson, or negative binomial distributions
 #' (Zeileis, Kleiber & Jackman (2008) <doi:10.18637/jss.v027.i08>).
 #' The gap time between two consecutive drug dispensing visis
 #' is modeled using linear regression given the number of skipped
@@ -49,7 +49,7 @@
 #'
 #' For \code{k0} and \code{ki}, we explore several modeling options,
 #' including constant, Poisson, zero-inflated Poisson (ZIP), and
-#' zero-inflated negative binomial (ZINB) distributions.
+#' negative binomial distributions.
 #'
 #' For \code{t0}, we consider various models such as constant,
 #' exponential, Weibull, log-logistic, and log-normal.
@@ -94,6 +94,7 @@
 #' @importFrom plotly add_trace layout plot_ly
 #' @importFrom icenReg ic_par
 #' @importFrom pscl zeroinfl
+#' @importFrom MASS glm.nb
 #' @importFrom nlme lme
 #' @importFrom parallel detectCores makeCluster
 #' @importFrom foreach %do% %dopar% foreach
