@@ -871,7 +871,7 @@ ui <- fluidPage(
           "to_show_dosing",
           label = "What to show on dosing prediction plot?",
           choices = c("Protocol based", "Model based"),
-          selected = c("Protocol based", "Model based"),
+          selected = c("Model based"),
           inline = TRUE
         )
       ),
@@ -2341,7 +2341,7 @@ server <- function(input, output, session) {
 
 
 
-  dosing <- reactive({
+  dosing <- eventReactive(input$predict, {
     if (predict_dosing()) {
       req(pred()$event_pred)
       req(pred()$stage == input$stage && pred()$to_predict == to_predict())
@@ -2796,7 +2796,7 @@ server <- function(input, output, session) {
               data = dfa, x = ~date, y = ~n,
               color = ~parameter, colors = "Set2",
               line = list(shape="hv", width=2),
-              name = "observed") %>%
+              name = "Observed") %>%
             plotly::add_lines(
               x = rep(observed()$cutoffdt, 2),
               y = c(min(dfa$n), max(dfb$upper)),
@@ -2898,7 +2898,7 @@ server <- function(input, output, session) {
                 data = dfai, x = ~date, y = ~n,
                 color = ~parameter, colors = "Set2",
                 line = list(shape="hv", width=2),
-                name = "observed") %>%
+                name = "Observed") %>%
               plotly::add_lines(
                 x = rep(observed()$cutoffdt, 2),
                 y = c(min(dfai$n), max(dfbi$upper)),
