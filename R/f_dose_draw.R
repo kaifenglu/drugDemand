@@ -19,8 +19,8 @@
 #'   patients with no drug dispensing records, with or without the
 #'   associated drug information.
 #'
-#' @return A data frame containing the drug dispensing visit dates
-#' at the subject level.
+#' @return A data frame containing the simulated drug dispensing visit
+#' dates at the subject level for ongoing and new subjects.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -97,7 +97,7 @@
 #'   filter(usubjid %in% unames2) %>%
 #'   select(drug, drug_name, dose_unit, usubjid, day, dose)
 #'
-#' # replicate for nreps times
+#' # replicate nreps times
 #' vf1_rep = tibble(draw = 1:nreps) %>%
 #'   cross_join(vf1)
 #'
@@ -159,13 +159,12 @@ f_dose_draw_t_1 <- function(
   } else if (model_k0 == "poisson") {
     theta_k0 = exp(fit_k0$theta[i])
   } else if (model_k0 == "zip") {
-    theta_k0 = c(pi = plogis(fit_k0$theta[i,2]),
-                 lambda = exp(fit_k0$theta[i,1]))
+    theta_k0 = c(plogis(fit_k0$theta[i,2]), exp(fit_k0$theta[i,1]))
   } else if (model_k0 == "nb") {
     mu = exp(fit_k0$theta[i,1])
     size = exp(fit_k0$theta[i,2])
     prob = size/(size + mu)
-    theta_k0 = c(size = size, prob = prob)
+    theta_k0 = c(size, prob)
   }
 
   model_t0 = fit_t0$fit$model
@@ -174,14 +173,11 @@ f_dose_draw_t_1 <- function(
   } else if (model_t0 == "exponential") {
     theta_t0 = exp(fit_t0$theta[i])
   } else if (model_t0 == "weibull") {
-    theta_t0 = c(kappa = exp(-fit_t0$theta[i,2]),
-                 lambda = exp(fit_t0$theta[i,1]))
+    theta_t0 = c(exp(-fit_t0$theta[i,2]), exp(fit_t0$theta[i,1]))
   } else if (model_t0 == "log-logistic") {
-    theta_t0 = c(mu = fit_t0$theta[i,1],
-                 sigma = exp(fit_t0$theta[i,2]))
+    theta_t0 = c(fit_t0$theta[i,1], exp(fit_t0$theta[i,2]))
   } else if (model_t0 == "log-normal") {
-    theta_t0 = c(mu = fit_t0$theta[i,1],
-                 sigma = exp(fit_t0$theta[i,2]))
+    theta_t0 = c(fit_t0$theta[i,1], exp(fit_t0$theta[i,2]))
   }
 
   mu0 = fit_t1$theta[i,1]
@@ -193,13 +189,12 @@ f_dose_draw_t_1 <- function(
   } else if (model_ki == "poisson") {
     theta_ki = exp(fit_ki$theta[i])
   } else if (model_ki == "zip") {
-    theta_ki = c(pi = plogis(fit_ki$theta[i,2]),
-                 lambda = exp(fit_ki$theta[i,1]))
+    theta_ki = c(plogis(fit_ki$theta[i,2]), exp(fit_ki$theta[i,1]))
   } else if (model_ki == "nb") {
     mu = exp(fit_ki$theta[i,1])
     size = exp(fit_ki$theta[i,2])
     prob = size/(size + mu)
-    theta_ki = c(size = size, prob = prob)
+    theta_ki = c(size, prob)
   }
 
   muT = fit_ti$theta[i,1]
@@ -216,8 +211,8 @@ f_dose_draw_t_1 <- function(
 
   # get other variables and combine with observed drug dispensing data
   df_ongoingi <- df_ongoingi %>%
-    dplyr::left_join(df_ongoing1 %>% dplyr::select(-c(
-      .data$V, .data$C, .data$D)), by = "usubjid") %>%
+    dplyr::left_join(df_ongoing1 %>% dplyr::select(
+      -c(.data$V, .data$C, .data$D)), by = "usubjid") %>%
     dplyr::mutate(status = "ongoing")
 
   # impute dosing for new patients
@@ -282,15 +277,18 @@ f_dose_draw_t_1 <- function(
 #'   associated with each drug, including the following variables:
 #'   \code{treatment}, \code{drug}, \code{drug_name}, and
 #'   \code{dose_unit}.
+#' @param l Number of drugs.
 #' @param t A vector of new time points for drug dispensing prediction.
 #'
 #' @return A list of two components:
 #'
 #' * \code{dosing_subject_newi}: A data frame for the drug dispensing
-#' data at the subject level by date for the given iteration.
+#' data at the subject level by date for ongoing and new subjects
+#' for the given iteration.
 #'
 #' * \code{dosing_summary_newi}: A data frame for the drug dispensing
-#' summary data by drug, time, and simulation draw for the given iteration.
+#' summary data by drug, time, and simulation draw for ongoing and
+#' new subjects for the given iteration.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -367,7 +365,7 @@ f_dose_draw_t_1 <- function(
 #'   filter(usubjid %in% unames2) %>%
 #'   select(drug, drug_name, dose_unit, usubjid, day, dose)
 #'
-#' # replicate for nreps times
+#' # replicate nreps times
 #' vf1_rep = tibble(draw = 1:nreps) %>%
 #'   cross_join(vf1)
 #'
@@ -415,7 +413,7 @@ f_dose_draw_t_1 <- function(
 #'   fit$fit_k0, fit$fit_t0, fit$fit_t1,
 #'   fit$fit_ki, fit$fit_ti, fit$fit_di,
 #'   vf_ongoing, vf_ongoing1, vf_new1,
-#'   treatment_by_drug_df, t)
+#'   treatment_by_drug_df, l, t)
 #'
 #' head(list1$dosing_subject_newi)
 #' head(list1$dosing_summary_newi)
@@ -427,9 +425,7 @@ f_dose_draw_1 <- function(
     fit_k0, fit_t0, fit_t1,
     fit_ki, fit_ti, fit_di,
     vf_ongoing, vf_ongoing1, vf_new1,
-    treatment_by_drug_df, t) {
-
-  l = length(unique(treatment_by_drug_df$drug))
+    treatment_by_drug_df, l, t) {
 
   # impute drug dispensing visit dates
   if (common_time_model) {
@@ -490,8 +486,7 @@ f_dose_draw_1 <- function(
       if (n_new == 0) {
         df_all <- df_ongoing2
       } else {
-        df_all <- df_ongoing2 %>%
-          dplyr::bind_rows(df_new2)
+        df_all <- dplyr::bind_rows(df_ongoing2, df_new2)
       }
 
       df_all
@@ -679,7 +674,7 @@ f_dose_draw <- function(
     dplyr::select(.data$drug, .data$drug_name, .data$dose_unit,
                   .data$usubjid, .data$day, .data$dose)
 
-  # replicate for nreps times
+  # replicate nreps times
   vf1_rep = dplyr::tibble(draw = 1:nreps) %>%
     dplyr::cross_join(vf1)
 
@@ -712,7 +707,7 @@ f_dose_draw <- function(
 
   # only keep the last record for each patient in each draw
   if (common_time_model) {
-    vf_ongoing1 <- vf_ongoing %>%
+    vf_ongoing1 <- vf_ongoing%>%
       dplyr::group_by(.data$draw, .data$usubjid) %>%
       dplyr::slice(dplyr::n()) %>%
       dplyr::mutate(V = .data$day - 1,
@@ -761,12 +756,9 @@ f_dose_draw <- function(
     fit_k0, fit_t0, fit_t1,
     fit_ki, fit_ti, fit_di,
     vf_ongoing, vf_ongoing1, vf_new1,
-    treatment_by_drug_df, t)
+    treatment_by_drug_df, l, t)
 
-  dosing_subject_new <- list1$dosing_subject_newi %>%
-    dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit,
-                   .data$draw, .data$usubjid, .data$day)
-
+  dosing_subject_new <- list1$dosing_subject_newi
 
   # register parallel backend
   ncores <- min(ncores_max, parallel::detectCores()/2)
@@ -783,7 +775,7 @@ f_dose_draw <- function(
       fit_k0, fit_t0, fit_t1,
       fit_ki, fit_ti, fit_di,
       vf_ongoing, vf_ongoing1, vf_new1,
-      treatment_by_drug_df, t)$dosing_summary_newi
+      treatment_by_drug_df, l, t)$dosing_summary_newi
   }
 
   # shut down the cluster of workers

@@ -24,6 +24,7 @@
 - print cum_dispense_plot if showplot is TRUE in the f_dose_observed function
 - add colors = "Set2" to cum_dispense_plot, bar_t0_plot, bar_ti_plot, and bar_di_plot in the f_dose_observed function
 - remove the custom legend of cum_dispense_plot in the f_dose_observed and f_drug_demand functions
+- add parameter l to the f_dose_draw_1 function to improve efficiency
 
 
 # drugDemand 0.1.0

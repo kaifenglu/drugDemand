@@ -66,7 +66,8 @@ f_treatment_by_drug_df <- function(
 #'   It must be specified at the design stage. It will be replaced with
 #'   the observed information at the analysis stage.
 #' @param treatment_by_drug The indicator matrix of treatment by drug
-#'   combinations.
+#'   combinations. It must be specified at the design stage. It will
+#'   be replaced with the observed information at the analysis stage.
 #' @param dosing_schedule_df A data frame providing dosing schedule
 #'   information. It contains the following variables: \code{drug},
 #'   \code{target_days}, \code{target_dose}, and \code{max_cycles}.
@@ -104,7 +105,8 @@ f_treatment_by_drug_df <- function(
 #'
 #' * \code{dosing_summary_t0} A data frame for the cumulative doses
 #' dispensed before the cutoff date. It contains the following
-#' variables: drug, drug_name, dose_unit, and cum_dose_t0.
+#' variables: \code{drug}, \code{drug_name}, \code{dose_unit}, and
+#' \code{cum_dose_t0}.
 #'
 #' * \code{cum_dispense_plot} The step plot for the cumulative doses
 #' dispensed for each drug.
@@ -214,6 +216,10 @@ f_drug_demand <- function(
 
   if (is.null(newEvents)) {
     stop("newEvents must be provided.")
+  }
+
+  if (is.null(dosing_schedule_df)) {
+    stop("dosing_schedule_df must be provided.")
   }
 
   if (!is.null(visitview) && is.null(df)) {
@@ -370,12 +376,12 @@ f_drug_demand <- function(
 
       fig[[j]] <- plotly::plot_ly() %>%
         plotly::add_lines(
-          data = dfb_pp, x = ~t, y = ~n, name = "median prediction pp",
+          data = dfb_pp, x = ~t, y = ~n, name = "median prediction protocol",
           line = list(width = 2)) %>%
         plotly::add_ribbons(
           data = dfb_pp, x = ~t, ymin = ~lower, ymax = ~upper,
           fill = "tonexty", line = list(width = 0),
-          name = "prediction interval pp") %>%
+          name = "prediction interval protocol") %>%
         plotly::layout(
           xaxis = list(title = "Days since trial start", zeroline = FALSE),
           yaxis = list(title = paste0("Doses to dispense ",
@@ -401,19 +407,19 @@ f_drug_demand <- function(
           data = dfa, x = ~date, y = ~n, name = "observed",
           line = list(shape ="hv", width = 2)) %>%
         plotly::add_lines(
-          data = dfb, x = ~date, y = ~n, name = "median prediction",
+          data = dfb, x = ~date, y = ~n, name = "median prediction model",
           line = list(width = 2)) %>%
         plotly::add_ribbons(
           data = dfb, x = ~date, ymin = ~lower, ymax = ~upper,
           fill = "tonexty", line = list(width = 0),
-          name = "prediction interval") %>%
+          name = "prediction interval model") %>%
         plotly::add_lines(
-          data = dfb_pp, x = ~date, y = ~n, name = "median prediction pp",
+          data = dfb_pp, x = ~date, y = ~n, name = "median prediction protocol",
           line = list(width = 2)) %>%
         plotly::add_ribbons(
           data = dfb_pp, x = ~date, ymin = ~lower, ymax = ~upper,
           fill = "tonexty", line = list(width = 0),
-          name = "prediction interval pp") %>%
+          name = "prediction interval protocol") %>%
         plotly::add_lines(
           x = rep(cutoffdt, 2), y = c(min(dfa$n), max(dfb_pp$upper)),
           name = "cutoff", line = list(dash = "dash"),

@@ -2,7 +2,7 @@ Package: drugDemand
 Type: Package
 Title: Drug Demand Forecasting
 Version: 0.1.1
-Date: 2023-10-27
+Date: 2023-10-28
 Authors@R: 
     person("Kaifeng", "Lu", , "kaifenglu@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-6160-7119"))
