@@ -81,7 +81,7 @@
 #' A data frame with 2290 rows and 8 columns:
 #' \describe{
 #'   \item{\code{usubjid}}{The unique subject ID.}
-#'   \item{\code{visit}}{The drug dispensing visit, e.g. "Cycle 1 Day 1".}
+#'   \item{\code{visit}}{The drug dispensing visit, e.g., "Cycle 1 Day 1".}
 #'   \item{\code{date}}{The date of the drug dispensing visit.}
 #'   \item{\code{drug}}{The numeric code of the drug.}
 #'   \item{\code{drug_name}}{The name of the drug.}
@@ -98,7 +98,7 @@
 #' A data frame with 5006 rows and 8 columns:
 #' \describe{
 #'   \item{\code{usubjid}}{The unique subject ID.}
-#'   \item{\code{visit}}{The drug dispensing visit, e.g. "Cycle 1 Day 1".}
+#'   \item{\code{visit}}{The drug dispensing visit, e.g., "Cycle 1 Day 1".}
 #'   \item{\code{date}}{The date of the drug dispensing visit.}
 #'   \item{\code{drug}}{The numeric code of the drug.}
 #'   \item{\code{drug_name}}{The name of the drug.}

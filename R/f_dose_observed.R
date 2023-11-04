@@ -34,45 +34,44 @@ f_bar_chart <- function(x) {
 #'
 #' @return A list with the following components:
 #'
-#' * \code{trialsdt} The trial start date.
+#' * \code{trialsdt}: The trial start date.
 #'
-#' * \code{cutoffdt} The cutoff date.
+#' * \code{cutoffdt}: The cutoff date.
 #'
-#' * \code{vf} A data frame for subject-level drug dispensing data,
-#' including the following variables: \code{drug}, \code{drug_name},
-#' \code{dose_unit}, \code{usubjid}, \code{treatment},
-#' \code{treatment_description}, \code{arrivalTime}, \code{time},
-#' \code{event}, \code{dropout}, \code{day}, \code{dose},
-#' \code{cum_dose}, and \code{row_id}.
+#' * \code{vf}: A data frame for subject-level drug dispensing data,
+#'   including the following variables: \code{drug}, \code{drug_name},
+#'   \code{dose_unit}, \code{usubjid}, \code{treatment},
+#'   \code{treatment_description}, \code{arrivalTime}, \code{time},
+#'   \code{event}, \code{dropout}, \code{day}, \code{dose},
+#'   \code{cum_dose}, and \code{row_id}.
 #'
-#' * \code{treatment_by_drug_df} A data frame indicating the treatments
-#' associated with each drug, including the following variables:
-#' \code{treatment}, \code{drug}, \code{drug_name}, and
-#' \code{dose_unit}.
+#' * \code{treatment_by_drug_df}: A data frame indicating the
+#'   treatments associated with each drug, including the following variables:
+#'   \code{treatment}, \code{drug}, \code{drug_name}, and \code{dose_unit}.
 #'
-#' * \code{dosing_summary_t} A data frame for the cumulative doses
-#' dispensed by each observed time point. It contains the following
-#' variables: \code{drug}, \code{drug_name}, \code{dose_unit},
-#' \code{t}, \code{n}, \code{lower}, \code{upper}, \code{mean},
-#' and \code{var}, where \code{lower} and \code{upper} have missing
-#' values, \code{mean = n}, and \code{var = 0}.
+#' * \code{dosing_summary_t}: A data frame for the cumulative doses
+#'   dispensed by each observed time point. It contains the following
+#'   variables: \code{drug}, \code{drug_name}, \code{dose_unit},
+#'   \code{t}, \code{n}, \code{lower}, \code{upper}, \code{mean},
+#'   and \code{var}, where \code{lower} and \code{upper} have missing
+#'   values, \code{mean = n}, and \code{var = 0}.
 #'
-#' * \code{dosing_summary_t0} A data frame for the cumulative doses
-#' dispensed before the cutoff date. It contains the following
-#' variables: \code{drug}, \code{drug_name}, \code{dose_unit},
-#' and \code{cum_dose_t0}.
+#' * \code{dosing_summary_t0}: A data frame for the cumulative doses
+#'   dispensed before the cutoff date. It contains the following
+#'   variables: \code{drug}, \code{drug_name}, \code{dose_unit},
+#'   and \code{cum_dose_t0}.
 #'
-#' * \code{cum_dispense_plot} The step plot for the cumulative doses
-#' dispensed for each drug.
+#' * \code{cum_dispense_plot}: The step plot for the cumulative doses
+#'   dispensed for each drug.
 #'
-#' * \code{bar_t0_plot} The bar chart for the gap time between randomization
-#' and the first drug dispensing visit.
+#' * \code{bar_t0_plot}: The bar chart for the gap time between
+#'   randomization and the first drug dispensing visit.
 #'
-#' * \code{bar_ti_plot} The bar chart for the gap time between two
-#' consecutive drug dispensing visits.
+#' * \code{bar_ti_plot}: The bar chart for the gap time between two
+#'   consecutive drug dispensing visits.
 #'
-#' * \code{bar_di_plot} The bar chart for the dispensed doses at drug
-#' dispensing visits.
+#' * \code{bar_di_plot}: The bar chart for the dispensed doses at drug
+#'   dispensing visits.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -92,8 +91,7 @@ f_dose_observed <- function(
   cutoffdt = df$cutoffdt[1]
 
   df <- df %>%
-    dplyr::mutate(arrivalTime = as.numeric(
-      .data$randdt - .data$trialsdt + 1))
+    dplyr::mutate(arrivalTime = as.numeric(.data$randdt - .data$trialsdt + 1))
 
   # set up drug/subject/day drug dispensing data
   vf <- visitview %>%
@@ -127,21 +125,13 @@ f_dose_observed <- function(
   t_df <- vf %>% dplyr::mutate(t1 = .data$arrivalTime + .data$day - 1)
   t_obs <- sort(unique(t_df$t1))
 
-  # obtain the subset of dosing records before each observed time point
-  dosing_subject_t <- dplyr::tibble(t = t_obs) %>%
+  # tally the doses across patients
+  dosing_summary_t <- dplyr::tibble(t = t_obs) %>%
     dplyr::cross_join(vf) %>%
     dplyr::filter(.data$arrivalTime + .data$day - 1 <= .data$t) %>%
-    dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                    .data$t, .data$usubjid) %>%
-    dplyr::summarise(cum_dose = sum(.data$dose), .groups = "drop_last")
-
-  # tally the doses across patients
-  dosing_summary_t <- dosing_subject_t %>%
-    dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                    .data$t) %>%
-    dplyr::summarise(n = sum(.data$cum_dose), .groups = "drop_last") %>%
-    dplyr::mutate(lower = NA, upper = NA,
-                  mean = .data$n, var = 0)
+    dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit, .data$t) %>%
+    dplyr::summarise(n = sum(.data$dose), .groups = "drop_last") %>%
+    dplyr::mutate(lower = NA, upper = NA, mean = .data$n, var = 0)
 
   # obtain the cumulative doses up to cutoff
   dosing_summary_t0 <- dosing_summary_t %>%
@@ -165,8 +155,7 @@ f_dose_observed <- function(
   # initialize the dosing plot data set
   df0 <- dplyr::tibble(drug = 1:l, drug_name = drug_name,
                        dose_unit = dose_unit, t = 1, n = 0,
-                       lower = NA, upper = NA,
-                       mean = 0, var = 0)
+                       lower = NA, upper = NA, mean = 0, var = 0)
 
   ad <- df0 %>%
     dplyr::bind_rows(dosing_summary_t) %>%

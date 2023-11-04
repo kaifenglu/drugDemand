@@ -18,9 +18,7 @@
 #'
 #' drug_name = drug_description_df$drug_name
 #' dose_unit = drug_description_df$dose_unit
-#' treatment_by_drug_df <- f_treatment_by_drug_df(
-#'   treatment_by_drug, drug_name, dose_unit)
-#' treatment_by_drug_df
+#' f_treatment_by_drug_df(treatment_by_drug, drug_name, dose_unit)
 #'
 #' @export
 f_treatment_by_drug_df <- function(
@@ -73,12 +71,26 @@ f_treatment_by_drug_df <- function(
 #'   \code{target_days}, \code{target_dose}, and \code{max_cycles}.
 #' @param model_k0 The model for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
+#'   Options include "constant", "poisson", "zip" for zero-inflated
+#'   Poisson, and "nb" for negative binomial.
 #' @param model_t0 The model for the gap time between randomization
 #'   and the first drug dispensing visit when there is no visit skipping.
+#'   Options include "constant", "exponential", "weibull",
+#'   "log-logistic", and "log-normal".
+#' @param model_t1 The model for the gap time between randomization
+#'   and the first drug dispensing visit when there is visit skipping.
+#'   Options include "ls" for least squares, and "lad" for least
+#'   absolute deviations.
 #' @param model_ki The model for the number of skipped
 #'   visits between two consecutive drug dispensing visits.
+#'   Options include "constant", "poisson", "zip" for zero-inflated
+#'   Poisson, and "nb" for negative binomial.
+#' @param model_ti The model for the gap time between two consecutive
+#'   drug dispensing visits. Options include "ls" for least squares,
+#'   and "lad" for least absolute deviations.
 #' @param model_di The model for the dispensed doses at drug
-#'   dispensing visits.
+#'   dispensing visits. Options include "constant",
+#'   "lm" for linear model, and "lme" for linear mixed-effects model.
 #' @param pilevel The prediction interval level.
 #' @param nyears The number of years after the data cut for prediction.
 #' @param ncores_max The maximum number of cores to use for parallel
@@ -91,68 +103,85 @@ f_treatment_by_drug_df <- function(
 #' @return For design-stage drug demand forecasting, a list with the
 #' following components:
 #'
-#' * \code{dosing_pred_pp} A data frame for dosing summary by drug and
-#' time point per protocol.
+#' * \code{dosing_pred_pp}: A data frame for dosing summary by drug and
+#'   time point per protocol. It includes the following variables: \code{drug},
+#'   \code{drug_name}, \code{dose_unit}, \code{t}, \code{n}, \code{pilevel},
+#'   \code{lower}, \code{upper}, \code{mean}, and \code{var}.
 #'
-#' * \code{dosing_pred_plot} A plot object for dosing prediction.
+#' * \code{dosing_pred_plot}: A plot object for dosing prediction.
 #'
 #' For analysis-stage drug demand forecasting, a list with the
 #' following components:
 #'
-#' * \code{trialsdt} The trial start date.
+#' * \code{trialsdt}: The trial start date.
 #'
-#' * \code{cutoffdt} The cutoff date.
+#' * \code{cutoffdt}: The cutoff date.
 #'
-#' * \code{dosing_summary_t0} A data frame for the cumulative doses
-#' dispensed before the cutoff date. It contains the following
-#' variables: \code{drug}, \code{drug_name}, \code{dose_unit}, and
-#' \code{cum_dose_t0}.
+#' * \code{dosing_summary_t0}: A data frame for the cumulative doses
+#'   dispensed before the cutoff date. It contains the following
+#'   variables: \code{drug}, \code{drug_name}, \code{dose_unit}, and
+#'   \code{cum_dose_t0}.
 #'
-#' * \code{cum_dispense_plot} The step plot for the cumulative doses
-#' dispensed for each drug.
+#' * \code{cum_dispense_plot}: The step plot for the cumulative doses
+#'   dispensed for each drug.
 #'
-#' * \code{bar_t0_plot} The bar chart for the time between randomization
-#' and the first drug dispensing visit.
+#' * \code{bar_t0_plot}: The bar chart for the time between
+#'   randomization and the first drug dispensing visit.
 #'
-#' * \code{bar_ti_plot} The bar chart for the gap time between two
-#' consecutive drug dispensing visits.
+#' * \code{bar_ti_plot}: The bar chart for the gap time between two
+#'   consecutive drug dispensing visits.
 #'
-#' * \code{bar_di_plot} The bar chart for the doses dispensed at drug
-#' dispensing visits.
+#' * \code{bar_di_plot}: The bar chart for the doses dispensed at drug
+#'   dispensing visits.
 #'
-#' * \code{common_time_model} A Boolean variable that indicates whether
-#' a common time model is used for drug dispensing visits.
+#' * \code{common_time_model}: A Boolean variable that indicates
+#'   whether a common time model is used for drug dispensing visits.
 #'
-#' * \code{fit_k0} The model fit for the number of skipped
-#' visits between randomization and the first drug dispensing visit.
+#' * \code{fit_k0}: The model fit for the number of skipped
+#'   visits between randomization and the first drug dispensing visit.
 #'
-#' * \code{fit_t0} The model fit for the gap time between randomization
-#' and the first drug dispensing visit when there is no visit skipping.
+#' * \code{fit_t0}: The model fit for the gap time between
+#'   randomization and the first drug dispensing visit when there is
+#'   no visit skipping.
 #'
-#' * \code{fit_t1} The model fit for the gap time between randomization
-#' and the first drug dispensing visit when there is visit skipping.
+#' * \code{fit_t1}: The model fit for the gap time between
+#'   randomization and the first drug dispensing visit when there is
+#'   visit skipping.
 #'
-#' * \code{fit_ki} The model fit for the number of skipped
-#' visits between two consecutive drug dispensing visits.
+#' * \code{fit_ki}: The model fit for the number of skipped
+#'   visits between two consecutive drug dispensing visits.
 #'
-#' * \code{fit_ti} The model fit for the gap time between two
-#' consecutive drug dispensing visits.
+#' * \code{fit_ti}: The model fit for the gap time between two
+#'   consecutive drug dispensing visits.
 #'
-#' * \code{fit_di} The model fit for the dispensed doses at drug
-#' dispensing visits.
+#' * \code{fit_di}: The model fit for the dispensed doses at drug
+#'   dispensing visits.
 #'
-#' * \code{dosing_subject} A data frame for the observed and imputed
-#' subject-level dosing records for the first iteration.
+#' * \code{dosing_subject}: A data frame for the observed and imputed
+#'   subject-level dosing records for the first iteration. It includes
+#'   the following variables: \code{drug}, \code{drug_name}, \code{dose_unit},
+#'   \code{usubjid}, \code{treatment}, \code{treatment_description},
+#'   \code{arrivalTime}, \code{time}, \code{day}, \code{dose},
+#'   \code{cum_dose}, \code{row_id}, \code{subject_type}, \code{imputed},
+#'   \code{trialsdt}, \code{cutoffdt}, \code{randdt}, \code{adt}, and
+#'   \code{date}.
 #'
-#' * \code{dosing_pred_df} A data frame for dosing summary by drug and
-#' time point.
+#' * \code{dosing_pred_df}: A data frame for dosing summary by drug and
+#'   time point. It includes the following variables: \code{drug},
+#'   \code{drug_name}, \code{dose_unit}, \code{t}, \code{n}, \code{pilevel},
+#'   \code{lower}, \code{upper}, \code{mean}, \code{var}, and \code{date}.
 #'
-#' * \code{dosing_pred_pp} A data frame for dosing summary by drug and
-#' time point per protocol.
+#' * \code{dosing_pred_pp}: A data frame for dosing summary by drug and
+#'   time point per protocol. It includes the following variables: \code{drug},
+#'   \code{drug_name}, \code{dose_unit}, \code{t}, \code{n}, \code{pilevel},
+#'   \code{lower}, \code{upper}, \code{mean}, \code{var}, and \code{date}.
 #'
-#' * \code{dosing_pred_plot} A plot object for dosing prediction.
+#' * \code{dosing_pred_plot}: A plot object for dosing prediction.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
+#'
+#' @seealso \code{\link{f_fit_t0}}, \code{\link{f_fit_ki}},
+#' \code{\link{f_fit_ti}}, \code{\link{f_fit_di}}
 #'
 #' @examples
 #'
@@ -185,7 +214,9 @@ f_treatment_by_drug_df <- function(
 #'   dosing_schedule_df = dosing_schedule_df,
 #'   model_k0 = "zip",
 #'   model_t0 = "log-logistic",
+#'   model_t1 = "ls",
 #'   model_ki = "zip",
+#'   model_ti = "ls",
 #'   model_di = "lme",
 #'   pilevel = 0.95,
 #'   nyears = 1,
@@ -207,7 +238,9 @@ f_drug_demand <- function(
     dosing_schedule_df = NULL,
     model_k0 = "zip",
     model_t0 = "exponential",
+    model_t1 = "ls",
     model_ki = "zip",
+    model_ti = "ls",
     model_di = "lme",
     pilevel = 0.95,
     nyears = 2,
@@ -280,8 +313,9 @@ f_drug_demand <- function(
       dplyr::mutate(date = as.Date(.data$t - 1, origin = trialsdt))
 
     # model fit to the observed drug dispensing data
-    fit <- f_dispensing_models(dosing_schedule_df$target_days, vf,
-                               model_k0, model_t0, model_ki, model_di,
+    fit <- f_dispensing_models(vf, dosing_schedule_df,
+                               model_k0, model_t0, model_t1,
+                               model_ki, model_ti, model_di,
                                nreps, showplot)
 
     # impute drug dispensing data for ongoing and new patients
@@ -404,26 +438,26 @@ f_drug_demand <- function(
 
       fig[[j]] <- plotly::plot_ly() %>%
         plotly::add_lines(
-          data = dfa, x = ~date, y = ~n, name = "observed",
-          line = list(shape ="hv", width = 2)) %>%
+          data = dfa, x = ~date, y = ~n, line = list(shape ="hv", width = 2),
+          name = "observed") %>%
         plotly::add_lines(
-          data = dfb, x = ~date, y = ~n, name = "median prediction model",
-          line = list(width = 2)) %>%
+          data = dfb, x = ~date, y = ~n, line = list(width = 2),
+          name = "median prediction model") %>%
         plotly::add_ribbons(
           data = dfb, x = ~date, ymin = ~lower, ymax = ~upper,
           fill = "tonexty", line = list(width = 0),
           name = "prediction interval model") %>%
         plotly::add_lines(
-          data = dfb_pp, x = ~date, y = ~n, name = "median prediction protocol",
-          line = list(width = 2)) %>%
+          data = dfb_pp, x = ~date, y = ~n, line = list(width = 2),
+          name = "median prediction protocol") %>%
         plotly::add_ribbons(
           data = dfb_pp, x = ~date, ymin = ~lower, ymax = ~upper,
           fill = "tonexty", line = list(width = 0),
           name = "prediction interval protocol") %>%
         plotly::add_lines(
           x = rep(cutoffdt, 2), y = c(min(dfa$n), max(dfb_pp$upper)),
-          name = "cutoff", line = list(dash = "dash"),
-          showlegend = FALSE) %>%
+          line = list(dash = "dash"), showlegend = FALSE,
+          name = "cutoff") %>%
         plotly::layout(
           xaxis = list(title = "", zeroline = FALSE),
           yaxis = list(title = paste0("Doses to dispense ",
@@ -446,7 +480,6 @@ f_drug_demand <- function(
     }
   }
 
-
   if (showplot) print(fig)
 
   # output results
@@ -454,8 +487,7 @@ f_drug_demand <- function(
     list(dosing_pred_pp = dosing_pred_pp,
          dosing_pred_plot = fig)
   } else {
-    list(trialsdt = trialsdt,
-         cutoffdt = cutoffdt,
+    list(trialsdt = trialsdt, cutoffdt = cutoffdt,
          dosing_summary_t0 = observed$dosing_summary_t0,
          cum_dispense_plot = observed$cum_dispense_plot,
          bar_t0_plot = observed$bar_t0_plot,

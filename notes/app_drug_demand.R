@@ -552,8 +552,9 @@ t1Panel <- tabPanel(
     label = paste("Which model to use for the time between randomization",
                   "and the first drug dispensing visit when there is",
                   "visit skipping?"),
-    choices = c("Linear regression" = "lm"),
-    selected = "lm",
+    choices = c("Least squares" = "ls",
+                "Least absolute deviations" = "lad"),
+    selected = "ls",
     inline = FALSE),
 
   uiOutput("t1_fit")
@@ -588,8 +589,9 @@ tiPanel <- tabPanel(
     "model_ti",
     label = paste("Which model to use for the time between two",
                   "consecutive drug dispensing visits?"),
-    choices = c("Linear regression" = "lm"),
-    selected = "lm",
+    choices = c("Least squares" = "ls",
+                "Least absolute deviations" = "lad"),
+    selected = "ls",
     inline = FALSE),
 
   uiOutput("ti_fit")
@@ -621,6 +623,7 @@ dosingPanel <- tabPanel(
     id = "dosing_tabset",
 
     dosingSchedulePanel,
+
     k0Panel,
     t0Panel,
     t1Panel,
@@ -712,7 +715,7 @@ ui <- fluidPage(
                             buttonLabel=list(icon("upload"), "Load inputs"),
                             width="116px"),
            tags$a(tags$span(icon(name = "question-circle")), target="_blank",
-                  href="simplified_manual.pdf"),
+                  href="drug_demand_shiny_manual.pdf"),
            style="position:absolute;right:0.5em;",
            tags$style(type='text/css', "#saveInputs{margin-top: -5px;}")
          ))),
@@ -870,7 +873,7 @@ ui <- fluidPage(
         checkboxGroupInput(
           "to_show_dosing",
           label = "What to show on dosing prediction plot?",
-          choices = c("Protocol based", "Model based"),
+          choices = c("Model based", "Protocol based"),
           selected = c("Model based"),
           inline = TRUE
         )
@@ -1001,7 +1004,6 @@ server <- function(input, output, session) {
 
 
 
-
   target_n <- reactive({
     req(input$target_n)
     valid = (input$target_n > 0 && input$target_n == round(input$target_n))
@@ -1067,14 +1069,15 @@ server <- function(input, output, session) {
   })
 
 
+  showModelBased <- reactive({
+    "Model based" %in% input$to_show_dosing
+  })
+
+
   showProtocolBased <- reactive({
     "Protocol based" %in% input$to_show_dosing
   })
 
-
-  showModelBased <- reactive({
-    "Model based" %in% input$to_show_dosing
-  })
 
 
   nreps <- reactive({
@@ -1976,8 +1979,7 @@ server <- function(input, output, session) {
         group_by(drug, drug_name, dose_unit, usubjid, treatment,
                  treatment_description, arrivalTime,
                  time, event, dropout, day) %>%
-        summarise(dose = sum(dispensed_quantity),
-                  .groups = "drop_last") %>%
+        summarise(dose = sum(dispensed_quantity), .groups = "drop_last") %>%
         mutate(cum_dose = cumsum(dose)) %>%
         group_by(drug, drug_name, dose_unit, usubjid) %>%
         mutate(row_id = row_number())
@@ -1996,14 +1998,27 @@ server <- function(input, output, session) {
   })
 
 
-  # whether to show or hide the k0 and t1 panels
-  observeEvent(model_k0(), {
-    if (model_k0() != "constant") {
-      showTab(inputId = "dosing_tabset", target = "k0_model_panel")
-      showTab(inputId = "dosing_tabset", target = "t1_model_panel")
+  # whether to show or hide k0, t0, t1, k0, ti, and di panels
+  observeEvent(list(input$stage, model_k0()), {
+    if (input$stage != 'Design stage') {
+      if (model_k0() != "constant") {
+        showTab(inputId = "dosing_tabset", target = "k0_model_panel")
+        showTab(inputId = "dosing_tabset", target = "t1_model_panel")
+      } else {
+        hideTab(inputId = "dosing_tabset", target = "k0_model_panel")
+        hideTab(inputId = "dosing_tabset", target = "t1_model_panel")
+      }
+      showTab(inputId = "dosing_tabset", target = "t0_model_panel")
+      showTab(inputId = "dosing_tabset", target = "ki_model_panel")
+      showTab(inputId = "dosing_tabset", target = "ti_model_panel")
+      showTab(inputId = "dosing_tabset", target = "di_model_panel")
     } else {
       hideTab(inputId = "dosing_tabset", target = "k0_model_panel")
+      hideTab(inputId = "dosing_tabset", target = "t0_model_panel")
       hideTab(inputId = "dosing_tabset", target = "t1_model_panel")
+      hideTab(inputId = "dosing_tabset", target = "ki_model_panel")
+      hideTab(inputId = "dosing_tabset", target = "ti_model_panel")
+      hideTab(inputId = "dosing_tabset", target = "di_model_panel")
     }
   })
 
@@ -2045,12 +2060,10 @@ server <- function(input, output, session) {
 
   fit_k0 <- reactive({
     if (!is.null(dose_observed()) & !is.null(dosing_schedule_df())) {
-      vf = dose_observed()$vf
-      target_days = dosing_schedule_df()$target_days
+      vf = dose_observed()$vf %>%
+        left_join(dosing_schedule_df(), by = "drug")
 
       if (common_time_model()) {
-        delta = target_days[1]
-
         # only keep one record per subject and drug dispensing day
         # need to redefine row_id due to drug dispensing at unscheduled visits
         vf1 <- vf %>%
@@ -2063,14 +2076,11 @@ server <- function(input, output, session) {
         df_k0 <- vf1 %>%
           filter(row_id == 1) %>%
           mutate(time = day,
-                 skipped = floor((time - delta/2)/delta) + 1)
+                 skipped = floor((time - target_days/2)/target_days) + 1)
 
         fit_k0 <- f_fit_ki(df_k0, model_k0(), nreps(), showplot = FALSE)
       } else {
-        fit_k0 <- purrr::map(1:length(target_days), function(h) {
-          # target number of days between drug dispensing visits
-          delta = target_days[h]
-
+        fit_k0 <- purrr::map(1:l(), function(h) {
           # observed dosing data for the drug under consideration
           vf1 <- vf %>% filter(drug == h)
 
@@ -2078,7 +2088,7 @@ server <- function(input, output, session) {
           df_k0 <- vf1 %>%
             filter(row_id == 1) %>%
             mutate(time = day,
-                   skipped = floor((time - delta/2)/delta) + 1)
+                   skipped = floor((time - target_days/2)/target_days) + 1)
 
           f_fit_ki(df_k0, model_k0(), nreps(), showplot = FALSE)
         })
@@ -2091,12 +2101,10 @@ server <- function(input, output, session) {
 
   fit_t0 <- reactive({
     if (!is.null(dose_observed()) & !is.null(dosing_schedule_df())) {
-      vf = dose_observed()$vf
-      target_days = dosing_schedule_df()$target_days
+      vf = dose_observed()$vf %>%
+        left_join(dosing_schedule_df(), by = "drug")
 
       if (common_time_model()) {
-        delta = target_days[1]
-
         # only keep one record per subject and drug dispensing day
         # need to redefine row_id due to drug dispensing at unscheduled visits
         vf1 <- vf %>%
@@ -2109,19 +2117,16 @@ server <- function(input, output, session) {
         df_k0 <- vf1 %>%
           filter(row_id == 1) %>%
           mutate(time = day,
-                 skipped = floor((time - delta/2)/delta) + 1)
+                 skipped = floor((time - target_days/2)/target_days) + 1)
 
         # no skipping
         df_t0 <- df_k0 %>%
           filter(skipped == 0) %>%
-          mutate(left = time - 1, right = time, status = 1)
+          mutate(left = time - 1, right = time)
 
         fit_t0 <- f_fit_t0(df_t0, model_t0(), nreps(), showplot = FALSE)
       } else {
-        fit_t0 <- purrr::map(1:length(target_days), function(h) {
-          # target number of days between drug dispensing visits
-          delta = target_days[h]
-
+        fit_t0 <- purrr::map(1:l(), function(h) {
           # observed dosing data for the drug under consideration
           vf1 <- vf %>% filter(drug == h)
 
@@ -2129,12 +2134,12 @@ server <- function(input, output, session) {
           df_k0 <- vf1 %>%
             filter(row_id == 1) %>%
             mutate(time = day,
-                   skipped = floor((time - delta/2)/delta) + 1)
+                   skipped = floor((time - target_days/2)/target_days) + 1)
 
           # no skipping
           df_t0 <- df_k0 %>%
             filter(skipped == 0) %>%
-            mutate(left = time - 1, right = time, status = 1)
+            mutate(left = time - 1, right = time)
 
           f_fit_t0(df_t0, model_t0(), nreps(), showplot = FALSE)
         })
@@ -2147,12 +2152,10 @@ server <- function(input, output, session) {
 
   fit_t1 <- reactive({
     if (!is.null(dose_observed()) & !is.null(dosing_schedule_df())) {
-      vf = dose_observed()$vf
-      target_days = dosing_schedule_df()$target_days
+      vf = dose_observed()$vf %>%
+        left_join(dosing_schedule_df(), by = "drug")
 
       if (common_time_model()) {
-        delta = target_days[1]
-
         # only keep one record per subject and drug dispensing day
         # need to redefine row_id due to drug dispensing at unscheduled visits
         vf1 <- vf %>%
@@ -2165,31 +2168,16 @@ server <- function(input, output, session) {
         df_k0 <- vf1 %>%
           filter(row_id == 1) %>%
           mutate(time = day,
-                 skipped = floor((time - delta/2)/delta) + 1)
+                 skipped = floor((time - target_days/2)/target_days) + 1)
 
         # skipping
         df_t1 <- df_k0 %>%
           filter(skipped > 0) %>%
           mutate(k1 = skipped)
 
-        if (nrow(df_t1) == 0) {
-          fit_t1 <- list(fit = list(model = "lm",
-                                    beta = 0,
-                                    vbeta = 0,
-                                    sigma = 0,
-                                    df = NA,
-                                    aic = NA,
-                                    bic = NA),
-                         fit_plot = NA,
-                         theta = matrix(0, nreps(), 2))
-        } else {
-          fit_t1 <- f_fit_ti(df_t1, model_t1(), nreps(), showplot = FALSE)
-        }
+        fit_t1 <- f_fit_ti(df_t1, model_t1(), nreps(), showplot = FALSE)
       } else {
-        fit_t1 <- purrr::map(1:length(target_days), function(h) {
-          # target number of days between drug dispensing visits
-          delta = target_days[h]
-
+        fit_t1 <- purrr::map(1:l(), function(h) {
           # observed dosing data for the drug under consideration
           vf1 <- vf %>% filter(drug == h)
 
@@ -2197,26 +2185,14 @@ server <- function(input, output, session) {
           df_k0 <- vf1 %>%
             filter(row_id == 1) %>%
             mutate(time = day,
-                   skipped = floor((time - delta/2)/delta) + 1)
+                   skipped = floor((time - target_days/2)/target_days) + 1)
 
           # skipping
           df_t1 <- df_k0 %>%
             filter(skipped > 0) %>%
             mutate(k1 = skipped)
 
-          if (nrow(df_t1) == 0) {
-            list(fit = list(model = "lm",
-                            beta = 0,
-                            vbeta = 0,
-                            sigma = 0,
-                            df = NA,
-                            aic = NA,
-                            bic = NA),
-                 fit_plot = NA,
-                 theta = matrix(0, nreps(), 2))
-          } else {
-            f_fit_ti(df_t1, model_t1(), nreps(), showplot = FALSE)
-          }
+          f_fit_ti(df_t1, model_t1(), nreps(), showplot = FALSE)
         })
       }
 
@@ -2227,12 +2203,10 @@ server <- function(input, output, session) {
 
   fit_ki <- reactive({
     if (!is.null(dose_observed()) & !is.null(dosing_schedule_df())) {
-      vf = dose_observed()$vf
-      target_days = dosing_schedule_df()$target_days
+      vf = dose_observed()$vf %>%
+        left_join(dosing_schedule_df(), by = "drug")
 
       if (common_time_model()) {
-        delta = target_days[1]
-
         # only keep one record per subject and drug dispensing day
         # need to redefine row_id due to drug dispensing at unscheduled visits
         vf1 <- vf %>%
@@ -2244,23 +2218,20 @@ server <- function(input, output, session) {
         # gap time and number of skipped visits between drug dispensing visits
         df_ti <- vf1 %>%
           mutate(time = lead(day) - day,
-                 skipped = pmax(floor((time - delta/2)/delta), 0),
+                 skipped = pmax(floor((time - target_days/2)/target_days), 0),
                  k1 = skipped + 1) %>%
           filter(row_id < n())
 
         fit_ki <- f_fit_ki(df_ti, model_ki(), nreps(), showplot = FALSE)
       } else {
-        fit_ki <- purrr::map(1:length(target_days), function(h) {
-          # target number of days between drug dispensing visits
-          delta = target_days[h]
-
+        fit_ki <- purrr::map(1:l(), function(h) {
           # observed dosing data for the drug under consideration
           vf1 <- vf %>% filter(drug == h)
 
           # gap time and number of skipped visits between drug dispensing visits
           df_ti <- vf1 %>%
             mutate(time = lead(day) - day,
-                   skipped = pmax(floor((time - delta/2)/delta), 0),
+                   skipped = pmax(floor((time - target_days/2)/target_days), 0),
                    k1 = skipped + 1) %>%
             filter(row_id < n())
 
@@ -2275,12 +2246,10 @@ server <- function(input, output, session) {
 
   fit_ti <- reactive({
     if (!is.null(dose_observed()) & !is.null(dosing_schedule_df())) {
-      vf = dose_observed()$vf
-      target_days = dosing_schedule_df()$target_days
+      vf = dose_observed()$vf %>%
+        left_join(dosing_schedule_df(), by = "drug")
 
       if (common_time_model()) {
-        delta = target_days[1]
-
         # only keep one record per subject and drug dispensing day
         # need to redefine row_id due to drug dispensing at unscheduled visits
         vf1 <- vf %>%
@@ -2292,23 +2261,20 @@ server <- function(input, output, session) {
         # gap time and number of skipped visits between drug dispensing visits
         df_ti <- vf1 %>%
           mutate(time = lead(day) - day,
-                 skipped = pmax(floor((time - delta/2)/delta), 0),
+                 skipped = pmax(floor((time - target_days/2)/target_days), 0),
                  k1 = skipped + 1) %>%
           filter(row_id < n())
 
         fit_ti <- f_fit_ti(df_ti, model_ti(), nreps(), showplot = FALSE)
       } else {
-        fit_ti <- purrr::map(1:length(target_days), function(h) {
-          # target number of days between drug dispensing visits
-          delta = target_days[h]
-
+        fit_ti <- purrr::map(1:l(), function(h) {
           # observed dosing data for the drug under consideration
           vf1 <- vf %>% filter(drug == h)
 
           # gap time and number of skipped visits between drug dispensing visits
           df_ti <- vf1 %>%
             mutate(time = lead(day) - day,
-                   skipped = pmax(floor((time - delta/2)/delta), 0),
+                   skipped = pmax(floor((time - target_days/2)/target_days), 0),
                    k1 = skipped + 1) %>%
             filter(row_id < n())
 
@@ -2325,9 +2291,8 @@ server <- function(input, output, session) {
   fit_di <- reactive({
     if (!is.null(dose_observed()) & !is.null(dosing_schedule_df())) {
       vf = dose_observed()$vf
-      target_days = dosing_schedule_df()$target_days
 
-      fit_di <- purrr::map(1:length(target_days), function(h) {
+      fit_di <- purrr::map(1:l(), function(h) {
         # observed dosing data for the drug under consideration
         vf1 <- vf %>% filter(drug == h)
 
@@ -2337,7 +2302,6 @@ server <- function(input, output, session) {
       fit_di
     }
   })
-
 
 
 
@@ -2374,36 +2338,34 @@ server <- function(input, output, session) {
 
 
       if (input$stage == 'Design stage') {
-        pred <- f_drug_demand(
+        drug_demand <- f_drug_demand(
           df = NULL,
           newEvents = newEvents,
           visitview = NULL,
           drug_description_df = drug_description_df(),
           treatment_by_drug = treatment_by_drug(),
           dosing_schedule_df = dosing_schedule_df(),
-          model_k0 = model_k0(),
-          model_t0 = model_t0(),
-          model_ki = model_ki(),
-          model_di = model_di(),
           pilevel = pilevel(),
           nyears = nyears(),
           showplot = FALSE)
       } else {
-        pred <- f_drug_demand(
+        drug_demand <- f_drug_demand(
           df = df(),
           newEvents = newEvents,
           visitview = visitview(),
           dosing_schedule_df = dosing_schedule_df(),
           model_k0 = model_k0(),
           model_t0 = model_t0(),
+          model_t1 = model_t1(),
           model_ki = model_ki(),
+          model_ti = model_ti(),
           model_di = model_di(),
           pilevel = pilevel(),
           nyears = nyears(),
           showplot = FALSE)
       }
 
-      pred
+      drug_demand
     }
   })
 
@@ -2489,7 +2451,7 @@ server <- function(input, output, session) {
         }
       }
 
-      print(table, quote=FALSE)
+      print(table, quote = FALSE)
     }
   })
 
@@ -2517,7 +2479,7 @@ server <- function(input, output, session) {
   )
 
 
-  output$dummy <-  renderText({
+  output$dummy <- renderText({
     if (!is.null(observed())) {
       str1 <- paste("Trial start date:", observed()$trialsdt)
       str2 <- paste("Data cutoff date:", observed()$cutoffdt)
@@ -2533,7 +2495,7 @@ server <- function(input, output, session) {
 
       colnames(table) <- c("Drug", "Drug Name", "Dose Unit",
                            "Cumulative Dose")
-      print(table, quote=FALSE, row.names = FALSE)
+      print(table, quote = FALSE, row.names = FALSE)
     }
   })
 
@@ -2569,6 +2531,7 @@ server <- function(input, output, session) {
   output$input_visitview <- renderDataTable(
     visitview(), options = list(pageLength = 10)
   )
+
 
   output$enroll_fit <- renderPlotly({
     if (!is.null(enroll_fit())) enroll_fit()$enroll_fit_plot
@@ -3298,6 +3261,8 @@ server <- function(input, output, session) {
 
   output$dosing_plot1 <- renderPlotly({
     if (!is.null(dosing())) {
+      req(pred()$stage == input$stage && pred()$to_predict == to_predict())
+
       if (input$stage == 'Design stage') {
         g <- purrr::map(1:l(), function(h) {
           dosing()$dosing_pred_plot[[h]] %>%
@@ -3316,17 +3281,17 @@ server <- function(input, output, session) {
           filter(is.na(lower)) %>%
           mutate(parameter = "observed")
 
-        if (showProtocolBased()) {
-          dfs <- dfs %>% bind_rows(
-            dosing()$dosing_pred_pp %>%
-              mutate(parameter = "protocol"))
-        }
-
         if (showModelBased()) {
           dfs <- dfs %>% bind_rows(
             dosing()$dosing_pred_df %>%
               filter(!is.na(lower)) %>%
               mutate(parameter = "model"))
+        }
+
+        if (showProtocolBased()) {
+          dfs <- dfs %>% bind_rows(
+            dosing()$dosing_pred_pp %>%
+              mutate(parameter = "protocol"))
         }
 
         dfs$parameter <- factor(dfs$parameter, levels = c(
@@ -3523,7 +3488,7 @@ server <- function(input, output, session) {
   # save inputs
   output$saveInputs <- downloadHandler(
     filename = function() {
-      paste0("inputs_", Sys.Date(), "_drug_supply.rds")
+      paste0("inputs_", Sys.Date(), "_drug_demand.rds")
     },
 
     content = function(file) {

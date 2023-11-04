@@ -1,3 +1,7 @@
+# drugDemand 0.1.2
+
+- add least absolute deviations (LAD) regression as an option for modelling the gap time between drug dispensing visits and rename the original linear model as least squares (LS)
+
 # drugDemand 0.1.1
 
 - add a reference for parametric analysis of interval-censored survival data
@@ -25,7 +29,12 @@
 - add colors = "Set2" to cum_dispense_plot, bar_t0_plot, bar_ti_plot, and bar_di_plot in the f_dose_observed function
 - remove the custom legend of cum_dispense_plot in the f_dose_observed and f_drug_demand functions
 - add parameter l to the f_dose_draw_1 function to improve efficiency
-
+- add structure and more details to the function parameters and output descriptions
+- combine the dosing_subject_t and dosing_summary_t steps in the f_dose_observed function to improve efficiency
+- replace target_days with dosing_schedule_df in the argument for the f_dispensing_models function
+- drop the creation of the status variable and use table instead of survfit for observed data summary in the f_fit_t0 function
+- add the handling of one observation case in the f_fit_ti function
+- remove the creation of the unames1 variable in the f_dose_draw function
 
 # drugDemand 0.1.0
 

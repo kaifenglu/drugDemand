@@ -58,10 +58,6 @@ drug_demand <- f_drug_demand(
   drug_description_df = drug_description_df,
   treatment_by_drug = treatment_by_drug,
   dosing_schedule_df = dosing_schedule_df,
-  model_k0 = "zip",
-  model_t0 = "log-logistic",
-  model_ki = "zip",
-  model_di = "lme",
   pilevel = 0.95,
   nyears = 3,
   showplot = FALSE)

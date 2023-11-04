@@ -4,8 +4,7 @@ library(drugDemand)
 
 set.seed(2000)
 
-df <- readxl::read_excel(
-  "notes/sitra_301/sitra-301-datacut-2023-08-22.xlsx") %>%
+df <- readxl::read_excel("notes/sitra_301/sitra-301-datacut-2023-08-22.xlsx") %>%
   dplyr::mutate(trialsdt = as.Date(trialsdt),
                 randdt = as.Date(randdt),
                 cutoffdt = as.Date(cutoffdt))
@@ -32,6 +31,7 @@ visitview <- read.csv(
   dplyr::select(usubjid, visit, date, drug, drug_name, dose_unit,
                 kit_number, dispensed_quantity) %>%
   dplyr::filter(date <= cutoffdt)
+
 
 dosing_schedule_df = dplyr::tibble(
   drug = c(1, 2, 3),
@@ -70,7 +70,9 @@ drug_demand <- f_drug_demand(
   dosing_schedule_df = dosing_schedule_df,
   model_k0 = "zip",
   model_t0 = "log-logistic",
+  model_t1 = "lad",
   model_ki = "zip",
+  model_ti = "lad",
   model_di = "lme",
   pilevel = 0.95,
   nyears = 1,
