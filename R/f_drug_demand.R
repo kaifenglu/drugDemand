@@ -71,26 +71,25 @@ f_treatment_by_drug_df <- function(
 #'   \code{target_days}, \code{target_dose}, and \code{max_cycles}.
 #' @param model_k0 The model for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
-#'   Options include "constant", "poisson", "zip" for zero-inflated
-#'   Poisson, and "nb" for negative binomial.
+#'   Options include "constant", "poisson", "zero-inflated poisson",
+#'   and "negative binomial".
 #' @param model_t0 The model for the gap time between randomization
 #'   and the first drug dispensing visit when there is no visit skipping.
 #'   Options include "constant", "exponential", "weibull",
 #'   "log-logistic", and "log-normal".
 #' @param model_t1 The model for the gap time between randomization
 #'   and the first drug dispensing visit when there is visit skipping.
-#'   Options include "ls" for least squares, and "lad" for least
-#'   absolute deviations.
+#'   Options include "least squares", and "least absolute deviations".
 #' @param model_ki The model for the number of skipped
 #'   visits between two consecutive drug dispensing visits.
-#'   Options include "constant", "poisson", "zip" for zero-inflated
-#'   Poisson, and "nb" for negative binomial.
+#'   Options include "constant", "poisson", "zero-inflated poisson",
+#'   and "negative binomial".
 #' @param model_ti The model for the gap time between two consecutive
-#'   drug dispensing visits. Options include "ls" for least squares,
-#'   and "lad" for least absolute deviations.
+#'   drug dispensing visits. Options include "least squares",
+#'   and "least absolute deviations".
 #' @param model_di The model for the dispensed doses at drug
 #'   dispensing visits. Options include "constant",
-#'   "lm" for linear model, and "lme" for linear mixed-effects model.
+#'   "linear model", and "linear mixed-effects model".
 #' @param pilevel The prediction interval level.
 #' @param nyears The number of years after the data cut for prediction.
 #' @param ncores_max The maximum number of cores to use for parallel
@@ -212,12 +211,12 @@ f_treatment_by_drug_df <- function(
 #'   newEvents = pred$event_pred$newEvents,
 #'   visitview = visitview2,
 #'   dosing_schedule_df = dosing_schedule_df,
-#'   model_k0 = "zip",
+#'   model_k0 = "zero-inflated poisson",
 #'   model_t0 = "log-logistic",
-#'   model_t1 = "ls",
-#'   model_ki = "zip",
-#'   model_ti = "ls",
-#'   model_di = "lme",
+#'   model_t1 = "least squares",
+#'   model_ki = "zero-inflated poisson",
+#'   model_ti = "least squares",
+#'   model_di = "linear mixed-effects model",
 #'   pilevel = 0.95,
 #'   nyears = 1,
 #'   ncores_max = 2,
@@ -236,12 +235,12 @@ f_drug_demand <- function(
     drug_description_df = NULL,
     treatment_by_drug = NULL,
     dosing_schedule_df = NULL,
-    model_k0 = "zip",
+    model_k0 = "zero-inflated poisson",
     model_t0 = "exponential",
-    model_t1 = "ls",
-    model_ki = "zip",
-    model_ti = "ls",
-    model_di = "lme",
+    model_t1 = "least squares",
+    model_ki = "zero-inflated poisson",
+    model_ti = "least squares",
+    model_di = "linear mixed-effects model",
     pilevel = 0.95,
     nyears = 2,
     ncores_max = 10,

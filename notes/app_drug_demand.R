@@ -512,10 +512,10 @@ k0Panel <- tabPanel(
     label = paste("Which model to use for the number of skipped visits",
                   "between randomization and the first drug dispensing",
                   "visit?"),
-    choices = c("Poisson" = "poisson",
-                "Zero-inflated Poisson" = "zip",
-                "Negative binomial" = "nb"),
-    selected = "zip",
+    choices = c("Poisson",
+                "Zero-inflated Poisson",
+                "Negative binomial"),
+    selected = "Zero-inflated Poisson",
     inline = FALSE),
 
   uiOutput("k0_fit")
@@ -532,11 +532,11 @@ t0Panel <- tabPanel(
     label = paste("Which model to use for the time between randomization",
                   "and the first drug dispensing visit when there is",
                   "no visit skipping?"),
-    choices = c("Exponential" = "exponential",
-                "Weibull" = "weibull",
-                "Log-logistic" = "log-logistic",
-                "Log-normal" = "log-normal"),
-    selected = "log-logistic",
+    choices = c("Exponential",
+                "Weibull",
+                "Log-logistic",
+                "Log-normal"),
+    selected = "Log-logistic",
     inline = FALSE),
 
   uiOutput("t0_fit")
@@ -552,9 +552,9 @@ t1Panel <- tabPanel(
     label = paste("Which model to use for the time between randomization",
                   "and the first drug dispensing visit when there is",
                   "visit skipping?"),
-    choices = c("Least squares" = "ls",
-                "Least absolute deviations" = "lad"),
-    selected = "ls",
+    choices = c("Least squares",
+                "Least absolute deviations"),
+    selected = "Least squares",
     inline = FALSE),
 
   uiOutput("t1_fit")
@@ -570,10 +570,10 @@ kiPanel <- tabPanel(
     "model_ki",
     label = paste("Which model to use for the number of skipped visits",
                   "between two consecutive drug dispensing visits?"),
-    choices = c("Poisson" = "poisson",
-                "Zero-inflated Poisson" = "zip",
-                "Negative binomial" = "nb"),
-    selected = "zip",
+    choices = c("Poisson",
+                "Zero-inflated Poisson",
+                "Negative binomial"),
+    selected = "Zero-inflated Poisson",
     inline = FALSE),
 
   uiOutput("ki_fit")
@@ -589,9 +589,9 @@ tiPanel <- tabPanel(
     "model_ti",
     label = paste("Which model to use for the time between two",
                   "consecutive drug dispensing visits?"),
-    choices = c("Least squares" = "ls",
-                "Least absolute deviations" = "lad"),
-    selected = "ls",
+    choices = c("Least squares",
+                "Least absolute deviations"),
+    selected = "Least squares",
     inline = FALSE),
 
   uiOutput("ti_fit")
@@ -606,9 +606,9 @@ diPanel <- tabPanel(
     "model_di",
     label = paste("Which model to use for the doses dispensed at drug",
                   "dispensing visits?"),
-    choices = c("Linear model" = "lm",
-                "Linear mixed-effects model" = "lme"),
-    selected = "lme",
+    choices = c("Linear model",
+                "Linear mixed-effects model"),
+    selected = "Linear mixed-effects model",
     inline = FALSE),
 
   uiOutput("di_fit")
@@ -1991,7 +1991,7 @@ server <- function(input, output, session) {
 
       a = sum(df_k0$skipped)
 
-      ifelse(a == 0, "constant", input$model_k0)
+      ifelse(a == 0, "Constant", input$model_k0)
     } else {
       input$model_k0
     }
@@ -2001,7 +2001,7 @@ server <- function(input, output, session) {
   # whether to show or hide k0, t0, t1, k0, ti, and di panels
   observeEvent(list(input$stage, model_k0()), {
     if (input$stage != 'Design stage') {
-      if (model_k0() != "constant") {
+      if (model_k0() != "Constant") {
         showTab(inputId = "dosing_tabset", target = "k0_model_panel")
         showTab(inputId = "dosing_tabset", target = "t1_model_panel")
       } else {
@@ -3378,11 +3378,11 @@ server <- function(input, output, session) {
 
   output$downloadDosingSubjectData <- downloadHandler(
     filename = function() {
-      paste0("dosing_subject_data_", Sys.Date(), ".csv")
+      paste0("dosing_subject_data_", Sys.Date(), ".xlsx")
     },
     content = function(file) {
       dosingsubjectdata <- dosing()$dosing_subject
-      write.csv(dosingsubjectdata, file)
+      writexl::write_xlsx(dosingsubjectdata, file)
     }
   )
 
@@ -3735,7 +3735,7 @@ server <- function(input, output, session) {
         session, paste0("dosing_schedule_", x$l),
         value=x$dosing_schedule)
 
-      if (x$model_k0 != "constant") {
+      if (x$model_k0 != "Constant") {
         updateRadioButtons(session, "model_k0", selected=x$model_k0)
         updateRadioButtons(session, "model_t1", selected=x$model_t1)
       }

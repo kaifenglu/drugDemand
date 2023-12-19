@@ -90,8 +90,10 @@
 #'
 #' fit <- f_dispensing_models(
 #'   vf, dosing_schedule_df,
-#'   model_k0 = "zip", model_t0 = "log-logistic", model_t1 = "ls",
-#'   model_ki = "zip", model_ti = "ls", model_di = "lme",
+#'   model_k0 = "zero-inflated poisson",
+#'   model_t0 = "log-logistic", model_t1 = "least squares",
+#'   model_ki = "zero-inflated poisson", model_ti = "least squares",
+#'   model_di = "linear mixed-effects model",
 #'   nreps = 200, showplot = FALSE)
 #'
 #' trialsdt = df$trialsdt[1]
@@ -166,21 +168,21 @@ f_dose_draw_t_1 <- function(
     fit_ki, fit_ti,
     vf_ongoing1, vf_new1) {
 
-  model_k0 = fit_k0$fit$model
+  model_k0 = tolower(fit_k0$fit$model)
   if (model_k0 == "constant") {
     theta_k0 = fit_k0$theta[i]
   } else if (model_k0 == "poisson") {
     theta_k0 = exp(fit_k0$theta[i])
-  } else if (model_k0 == "zip") {
+  } else if (model_k0 == "zero-inflated poisson") {
     theta_k0 = c(plogis(fit_k0$theta[i,2]), exp(fit_k0$theta[i,1]))
-  } else if (model_k0 == "nb") {
+  } else if (model_k0 == "negative binomial") {
     mu = exp(fit_k0$theta[i,1])
     size = exp(fit_k0$theta[i,2])
     prob = size/(size + mu)
     theta_k0 = c(size, prob)
   }
 
-  model_t0 = fit_t0$fit$model
+  model_t0 = tolower(fit_t0$fit$model)
   if (model_t0 == "constant") {
     theta_t0 = fit_t0$theta[i]
   } else if (model_t0 == "exponential") {
@@ -193,24 +195,24 @@ f_dose_draw_t_1 <- function(
     theta_t0 = c(fit_t0$theta[i,1], exp(fit_t0$theta[i,2]))
   }
 
-  model_t1 = fit_t1$fit$model
+  model_t1 = tolower(fit_t1$fit$model)
   theta_t1 = c(fit_t1$theta[i,1], fit_t1$theta[i,2])
 
-  model_ki = fit_ki$fit$model
+  model_ki = tolower(fit_ki$fit$model)
   if (model_ki == "constant") {
     theta_ki = fit_ki$theta[i]
   } else if (model_ki == "poisson") {
     theta_ki = exp(fit_ki$theta[i])
-  } else if (model_ki == "zip") {
+  } else if (model_ki == "zero-inflated poisson") {
     theta_ki = c(plogis(fit_ki$theta[i,2]), exp(fit_ki$theta[i,1]))
-  } else if (model_ki == "nb") {
+  } else if (model_ki == "negative binomial") {
     mu = exp(fit_ki$theta[i,1])
     size = exp(fit_ki$theta[i,2])
     prob = size/(size + mu)
     theta_ki = c(size, prob)
   }
 
-  model_ti = fit_ti$fit$model
+  model_ti = tolower(fit_ti$fit$model)
   theta_ti = c(fit_ti$theta[i,1], fit_ti$theta[i,2])
 
 
@@ -377,8 +379,10 @@ f_dose_draw_t_1 <- function(
 #'
 #' fit <- f_dispensing_models(
 #'   vf, dosing_schedule_df,
-#'   model_k0 = "zip", model_t0 = "log-logistic", model_t1 = "ls",
-#'   model_ki = "zip", model_ti = "ls", model_di = "lme",
+#'   model_k0 = "zero-inflated poisson", model_t0 = "log-logistic",
+#'   model_t1 = "least squares",
+#'   model_ki = "zero-inflated poisson", model_ti = "least squares",
+#'   model_di = "linear mixed-effects model",
 #'   nreps = 200, showplot = FALSE)
 #'
 #' trialsdt = df$trialsdt[1]
@@ -652,8 +656,10 @@ f_dose_draw_1 <- function(
 #'
 #' fit <- f_dispensing_models(
 #'   vf, dosing_schedule_df,
-#'   model_k0 = "zip", model_t0 = "log-logistic", model_t1 = "ls",
-#'   model_ki = "zip", model_ti = "ls", model_di = "lme",
+#'   model_k0 = "zero-inflated poisson", model_t0 = "log-logistic",
+#'   model_t1 = "least squares",
+#'   model_ki = "zero-inflated poisson", model_ti = "least squares",
+#'   model_di = "linear mixed-effects model",
 #'   nreps = 200, showplot = FALSE)
 #'
 #' trialsdt = df$trialsdt[1]

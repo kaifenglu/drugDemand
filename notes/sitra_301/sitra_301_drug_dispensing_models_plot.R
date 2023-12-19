@@ -7,8 +7,7 @@ tictoc::tic("plot")
 cutoffdt = as.Date("2022-10-01")
 
 df <- readxl::read_excel(
-  "notes/sitra_301/Sitra-301 upload R-Shiny - CN_22-Aug-2023 - no optional chemo.xlsx"
-) %>%
+  "notes/sitra_301/Sitra-301 upload R-Shiny - CN_22-Aug-2023.xlsx") %>%
   dplyr::mutate(trialsdt = as.Date(trialsdt),
                 randdt = as.Date(randdt),
                 cutoffdt = as.Date(cutoffdt))
@@ -23,8 +22,7 @@ l = length(drug_name)
 
 # visit view data supplemented with subject view data
 visitview <- read.csv(
-  "notes/sitra_301/BEIGE20210007_Blinded_VisitSummary_VisitView_22-Aug-2023 06_40_15.csv"
-) %>%
+  "notes/sitra_301/BEIGE20210007_Blinded_VisitSummary_VisitView_22-Aug-2023 06_40_15.csv") %>%
   dplyr::rename(usubjid = Subject.Number) %>%
   dplyr::mutate(drug = ifelse(grepl('^1', Kit.Number) |
                                 grepl('^2', Kit.Number), 2,
@@ -65,28 +63,26 @@ dosing_overview_mod <- readxl::read_excel(
   paste0("notes/sitra_301/sitra_301_dosing_pred_df_", cutoffdt, ".xlsx")) %>%
   dplyr::filter(t <= t_half + 30)
 
+pilevel = dosing_overview_pp$pilevel[1]
 
 ### plot
 df0 <- dplyr::tibble(drug = 1:l,
                      drug_name = drug_name,
                      dose_unit = dose_unit,
-                     t = 1, n = 0, lower = NA, upper = NA,
+                     t = 1, n = 0, pilevel = pilevel,
+                     lower = NA, upper = NA,
                      mean = 0, var = 0)
 
 
 t_obs <- unique((vf %>% dplyr::mutate(
   t1 = as.numeric(date - trialsdt + 1)))$t1)
 
-dosing_subject_t <- dplyr::tibble(t = t_obs) %>%
+dosing_summary_t <- dplyr::tibble(t = t_obs) %>%
   dplyr::cross_join(vf) %>%
   dplyr::filter(date <= as.Date(t-1, origin = trialsdt)) %>%
-  dplyr::group_by(drug, drug_name, dose_unit, t, usubjid) %>%
-  dplyr::summarise(cum_dose = sum(dose), .groups = "drop_last")
-
-dosing_summary_t <- dosing_subject_t %>%
   dplyr::group_by(drug, drug_name, dose_unit, t) %>%
-  dplyr::summarise(n = sum(cum_dose), .groups = "drop_last") %>%
-  dplyr::mutate(lower = NA, upper = NA, mean = n, var = 0)
+  dplyr::summarise(n = sum(dose), .groups = "drop_last") %>%
+  dplyr::mutate(pilevel = pilevel, lower = NA, upper = NA, mean = n, var = 0)
 
 dosing_pred_df <- df0 %>%
   dplyr::bind_rows(dosing_summary_t) %>%
@@ -103,23 +99,25 @@ for (j in 1:l) {
   dfb_pp <- dplyr::filter(dosing_overview_pp, drug == j & !is.na(lower))
 
   g_dosing[[j]] <- plotly::plot_ly() %>%
-    plotly::add_ribbons(
-      data = dfb, x = ~date, ymin = ~lower, ymax = ~upper,
-      fill = "tonexty", line = list(width=0),
-      name = "prediction interval") %>%
-    plotly::add_lines(
-      data = dfb, x = ~date, y = ~n, name = "median prediction",
-      line = list(width=2)) %>%
     plotly::add_lines(
       data = dfa, x = ~date, y = ~n, name = "observed",
       line = list(shape = "hv", width = 2)) %>%
+    plotly::add_lines(
+      data = dfb, x = ~date, y = ~n,
+      name = "median prediction model",
+      line = list(width=2)) %>%
+    plotly::add_ribbons(
+      data = dfb, x = ~date, ymin = ~lower, ymax = ~upper,
+      fill = "tonexty", line = list(width=0),
+      name = "prediction interval model") %>%
+    plotly::add_lines(
+      data = dfb_pp, x = ~date, y = ~n,
+      name = "median prediction protocol",
+      line = list(width = 2)) %>%
     plotly::add_ribbons(
       data = dfb_pp, x = ~date, ymin = ~lower, ymax = ~upper,
       fill = "tonexty", line = list(width = 0),
-      name = "prediction interval pp") %>%
-    plotly::add_lines(
-      data = dfb_pp, x = ~date, y = ~n, name = "median prediction pp",
-      line = list(width = 2)) %>%
+      name = "prediction interval protocol") %>%
     plotly::add_lines(
       x = rep(cutoffdt, 2), y = c(min(dfa$n), max(dfb_pp$upper)),
       name = "cutoff", line = list(dash = "dash"),
@@ -129,14 +127,11 @@ for (j in 1:l) {
       yaxis = list(title = paste0("Doses to dispense ",
                                   "(", dfb_pp$dose_unit[1], ")"),
                    zeroline = FALSE),
-      legend = list(x = 0, y = 1.05, yanchor = "bottom",
-                    orientation = 'h'),
       annotations = list(
         x = 0.5, y = 1,
         text = paste0("<b>", dfb_pp$drug_name[1], "</b>"),
         xanchor = "center", yanchor = "bottom",
         showarrow = FALSE, xref = 'paper', yref = 'paper'))
-
 
   if (j == 1) {
     g_dosing[[j]] <- g_dosing[[j]] %>%
@@ -145,10 +140,21 @@ for (j in 1:l) {
           x = cutoffdt, y = 0, text = 'cutoff',
           xanchor = "left", yanchor = "bottom",
           font = list(size = 12), showarrow = FALSE))
-
   }
 }
 
+tictoc::toc()
+
 g_dosing
 
-tictoc::toc()
+# install.packages("reticulate")
+# #reticulate::install_miniconda()
+# reticulate::conda_install('r-reticulate', 'python-kaleido')
+# reticulate::conda_install('r-reticulate', 'plotly', channel = 'plotly')
+# reticulate::use_miniconda('r-reticulate')
+#
+# tmp = "notes/sitra_301/docetaxel_validation.svg"
+# save_image(g_dosing[[3]], tmp, width = 1200, height = 600)
+# file.show(tmp)
+
+

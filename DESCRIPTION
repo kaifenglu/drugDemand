@@ -2,7 +2,7 @@ Package: drugDemand
 Type: Package
 Title: Drug Demand Forecasting
 Version: 0.1.2
-Date: 2023-11-04
+Date: 2023-12-18
 Authors@R: 
     person("Kaifeng", "Lu", , "kaifenglu@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-6160-7119"))
@@ -23,12 +23,12 @@ Imports:
     MASS (>= 7.3-54),
     nlme (>= 3.1-153),
     L1pack (>= 0.41-24),
-    eventPred (>= 0.2.0),
+    eventPred (>= 0.2.3),
     parallel (>= 4.1.2),
     foreach (>= 1.5.2),
     doParallel (>= 1.0.17),
     doRNG (>= 1.8.6),
-    tictoc (>= 1.2)
+    tictoc (>= 1.1)
 LinkingTo: Rcpp
 Depends: 
     R (>= 3.5.0)

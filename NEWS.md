@@ -1,6 +1,7 @@
 # drugDemand 0.1.2
 
 - add least absolute deviations (LAD) regression as an option for modelling the gap time between drug dispensing visits and rename the original linear model as least squares (LS)
+- use more descriptive names for drug dispensing models
 
 # drugDemand 0.1.1
 
