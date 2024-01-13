@@ -18,7 +18,7 @@ using namespace Rcpp;
 //' @param theta_ki The model parameters for the number of skipped visits
 //'   between two consecutive drug dispensing visits.
 //' @param model_ti The model for the gap time between two consecutive
-//'   drug dispensing visits. Options include "least squares",
+//'   drug dispensing visits. Options include "least squares"
 //'   and "least absolute deviations".
 //' @param theta_ti The model parameters for the gap time between
 //'   two consecutive drug dispensing visits.
@@ -185,7 +185,7 @@ DataFrame f_dose_ongoing_cpp(const StringVector usubjid,
 //' @param theta_ki The model parameters for the number of skipped
 //'   visits between two consecutive drug dispensing visits.
 //' @param model_ti The model for the gap time between two consecutive
-//'   drug dispensing visits. Options include "least squares",
+//'   drug dispensing visits. Options include "least squares"
 //'   and "least absolute deviations".
 //' @param theta_ti The model parameters for the gap time between
 //'   two consecutive drug dispensing visits.

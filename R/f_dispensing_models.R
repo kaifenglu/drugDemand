@@ -124,31 +124,51 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
       model = "exponential"
     }
 
+    f_nloglik <- function(theta, df, model) {
+      if (tolower(model) == "exponential") {
+        -sum(log(pexp(df$right, exp(theta)) -
+                   pexp(df$left, exp(theta))))
+      } else if (tolower(model) == "weibull") {
+        -sum(log(pweibull(df$right, exp(-theta[2]), exp(theta[1])) -
+                   pweibull(df$left, exp(-theta[2]), exp(theta[1]))))
+      } else if (tolower(model) == "log-logistic") {
+        -sum(log(plogis(log(df$right), theta[1], exp(theta[2])) -
+                   plogis(log(df$left), theta[1], exp(theta[2]))))
+      } else if (tolower(model) == "log-normal") {
+        -sum(log(pnorm(log(df$right), theta[1], exp(theta[2])) -
+                   pnorm(log(df$left), theta[1], exp(theta[2]))))
+      }
+    }
+
     if (model == "exponential") {
-      a <- icenReg::ic_par(cbind(left, right) ~ 1, data = df,
-                           model = "ph", dist = "exponential")
+      a <- survreg(Surv(right) ~ 1, data = df, dist = "exponential")
+      theta = -as.numeric(a$coefficients)
+
+      opt = optim(theta, f_nloglik, gr = NULL, df, model,
+                  method = "Brent", lower = theta - 10, upper = theta + 10,
+                  hessian = TRUE)
 
       fit <- list(model = "Exponential",
-                  theta = -as.numeric(a$coefficients),  # log(rate)
-                  vtheta = as.numeric(a$var),
-                  aic = -2*a$llk + 2,
-                  bic = -2*a$llk + log(n))
+                  theta = opt$par,
+                  vtheta = as.numeric(solve(opt$hessian)),
+                  aic = 2*opt$value + 2,
+                  bic = 2*opt$value + log(n))
 
       rate = exp(fit$theta)
       p.fit = pexp(y+1, rate) - pexp(y, rate)
 
       post = rnorm(nreps, mean = fit$theta, sd = sqrt(fit$vtheta))
     } else if (model == "weibull") {
-      a <- icenReg::ic_par(cbind(left, right) ~ 1, data = df,
-                           model = "ph", dist = "weibull")
+      a <- survreg(Surv(right) ~ 1, data = df, dist = "weibull")
+      theta = c(as.numeric(a$coefficients), log(a$scale))
 
-      # convert to (log(lambda) = log_scale, -log(kappa) = -log_shape)
-      const = matrix(c(0, 1, -1, 0), 2, 2, byrow = TRUE)
+      opt = optim(theta, f_nloglik, gr = NULL, df, model, hessian = TRUE)
+
       fit <- list(model = "Weibull",
-                  theta = c(const %*% a$coefficients),
-                  vtheta = const %*% a$var %*% t(const),
-                  aic = -2*a$llk + 4,
-                  bic = -2*a$llk + 2*log(n))
+                  theta = opt$par,
+                  vtheta = matrix(solve(opt$hessian), 2, 2),
+                  aic = 2*opt$value + 4,
+                  bic = 2*opt$value + 2*log(n))
 
       lambda = exp(fit$theta[1])
       k = exp(-fit$theta[2])
@@ -156,16 +176,16 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 
       post = mvtnorm::rmvnorm(nreps, mean = fit$theta, sigma = fit$vtheta)
     } else if (model == "log-logistic") {
-      a <- icenReg::ic_par(cbind(left, right) ~ 1, data = df,
-                           model = "ph", dist = "loglogistic")
+      a <- survreg(Surv(right) ~ 1, data = df, dist = "loglogistic")
+      theta = c(as.numeric(a$coefficients), log(a$scale))
 
-      # convert to (mu = log_scale, log(sigma) = -log_shape)
-      const = matrix(c(1, 0, 0, -1), 2, 2, byrow = TRUE)
+      opt = optim(theta, f_nloglik, gr = NULL, df, model, hessian = TRUE)
+
       fit <- list(model = "Log-logistic",
-                  theta = c(const %*% a$coefficients),
-                  vtheta = const %*% a$var %*% t(const),
-                  aic = -2*a$llk + 4,
-                  bic = -2*a$llk + 2*log(n))
+                  theta = opt$par,
+                  vtheta = matrix(solve(opt$hessian), 2, 2),
+                  aic = 2*opt$value + 4,
+                  bic = 2*opt$value + 2*log(n))
 
       mu = fit$theta[1]
       sigma = exp(fit$theta[2])
@@ -173,15 +193,16 @@ f_fit_t0 <- function(df, model, nreps, showplot = TRUE) {
 
       post = mvtnorm::rmvnorm(nreps, mean = fit$theta, sigma = fit$vtheta)
     } else if (model == "log-normal") {
-      a <- icenReg::ic_par(cbind(left, right) ~ 1, data = df,
-                           model = "ph", dist = "lnorm")
+      a <- survreg(Surv(right) ~ 1, data = df, dist = "lognormal")
+      theta = c(as.numeric(a$coefficients), log(a$scale))
 
-      # parametrization: (mu = mean.log, log(sigma) = log(sd.log))
+      opt = optim(theta, f_nloglik, gr = NULL, df, model, hessian = TRUE)
+
       fit <- list(model = "Log-normal",
-                  theta = as.numeric(a$coefficients),
-                  vtheta = a$var,
-                  aic = -2*a$llk + 4,
-                  bic = -2*a$llk + 2*log(n))
+                  theta = opt$par,
+                  vtheta = matrix(solve(opt$hessian), 2, 2),
+                  aic = 2*opt$value + 4,
+                  bic = 2*opt$value + 2*log(n))
 
       mu = fit$theta[1]
       sigma = exp(fit$theta[2])
@@ -355,13 +376,20 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 
       post = rnorm(nreps, mean = fit$theta, sd = sqrt(fit$vtheta))
     } else if (model == "zero-inflated poisson") {
-      a <- pscl::zeroinfl(skipped ~ 1 | 1, data = df, dist = "poisson")
+      f_nloglik <- function(theta, df) {
+        lambda = exp(theta[1])
+        pi = plogis(theta[2])
+        -sum(log(pi*(df$skipped == 0) + (1-pi)*dpois(df$skipped, lambda)))
+      }
+
+      theta = c(0, log(sum(df$skipped)/n))
+      opt <- optim(theta, f_nloglik, gr = NULL, df, hessian = TRUE)
 
       fit <- list(model = "Zero-inflated Poisson",
-                  theta = as.numeric(a$coefficients),
-                  vtheta = vcov(a),
-                  aic = -2*a$loglik + 4,
-                  bic = -2*a$loglik + 2*log(n))
+                  theta = opt$par,
+                  vtheta = matrix(solve(opt$hessian), 2, 2),
+                  aic = 2*opt$value + 4,
+                  bic = 2*opt$value + 2*log(n))
 
       lambda = exp(fit$theta[1])
       pi = plogis(fit$theta[2])

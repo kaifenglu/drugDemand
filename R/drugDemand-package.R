@@ -98,8 +98,6 @@
 #'   cross_join filter group_by inner_join lead left_join
 #'   mutate n rename row_number select slice summarise tibble
 #' @importFrom plotly add_trace layout plot_ly
-#' @importFrom icenReg ic_par
-#' @importFrom pscl zeroinfl
 #' @importFrom MASS glm.nb
 #' @importFrom nlme lme
 #' @importFrom L1pack lad

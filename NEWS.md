@@ -1,3 +1,7 @@
+# drugDemand 0.1.3
+
+- remove the dependence on pscl and icenReg packages
+
 # drugDemand 0.1.2
 
 - add least absolute deviations (LAD) regression as an option for modelling the gap time between drug dispensing visits and rename the original linear model as least squares (LS)

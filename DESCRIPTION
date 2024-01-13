@@ -1,8 +1,8 @@
 Package: drugDemand
 Type: Package
 Title: Drug Demand Forecasting
-Version: 0.1.2
-Date: 2023-12-18
+Version: 0.1.3
+Date: 2024-01-21
 Authors@R: 
     person("Kaifeng", "Lu", , "kaifenglu@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-6160-7119"))
@@ -18,8 +18,6 @@ Imports:
     mvtnorm (>= 1.1-3),
     erify (>= 0.4.0),
     stats (>= 3.5.0),
-    icenReg (>= 2.0.15),
-    pscl (>= 1.5.5),
     MASS (>= 7.3-54),
     nlme (>= 3.1-153),
     L1pack (>= 0.41-24),
