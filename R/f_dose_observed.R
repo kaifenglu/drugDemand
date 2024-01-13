@@ -10,7 +10,7 @@ f_bar_chart <- function(x) {
 }
 
 
-#' @title Summarize Observed Drug Dispensing Data
+#' @title Observed Drug Dispensing Data Summary
 #' @description Provides an overview of the observed drug dispensing data,
 #' including the trial start date, data cutoff date, cumulative number
 #' of doses dispensed by drug, bar chart of the gap time between randomization

@@ -443,7 +443,7 @@ f_fit_ki <- function(df, model, nreps, showplot = TRUE) {
 #'     the first drug dispensing visit and \code{skipped + 1}
 #'     for the gap time between two consecutive drug dispensing visits.
 #' @param model The model used to analyze the gap time. Options include
-#'   "least squares", and "least absolute deviations".
+#'   "least squares" and "least absolute deviations".
 #' @param nreps The number of simulations for drawing posterior model
 #'   parameter values.
 #' @param showplot A Boolean variable that controls whether or not to
@@ -875,7 +875,7 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
 #'   Options include "constant", "poisson", "zero-inflated poisson",
 #'   and "negative binomial".
 #' @param model_ti The model for the gap time between two consecutive
-#'   drug dispensing visits. Options include "least squares",
+#'   drug dispensing visits. Options include "least squares"
 #'   and "least absolute deviations".
 #' @param model_di The model for the dispensed doses at drug
 #'   dispensing visits. Options include "constant",

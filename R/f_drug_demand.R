@@ -49,8 +49,8 @@ f_treatment_by_drug_df <- function(
 #'   \code{time}, \code{event}, \code{dropout}, and \code{cutoffdt}.
 #' @param newEvents A data frame containing the imputed event data
 #'   for both ongoing and new patients, typically obtained from
-#'   the output of the \code{eventPred::getPrediction} function.
-#'   It contains the following variables:
+#'   the output of the \code{getPrediction} function of the
+#'   \code{eventPred} package. It contains the following variables:
 #'   \code{draw}, \code{usubjid}, \code{arrivalTime}, \code{treatment},
 #'   \code{treatment_description}, \code{time}, \code{event},
 #'   \code{dropout}, and \code{totalTime}.
@@ -79,13 +79,13 @@ f_treatment_by_drug_df <- function(
 #'   "log-logistic", and "log-normal".
 #' @param model_t1 The model for the gap time between randomization
 #'   and the first drug dispensing visit when there is visit skipping.
-#'   Options include "least squares", and "least absolute deviations".
+#'   Options include "least squares" and "least absolute deviations".
 #' @param model_ki The model for the number of skipped
 #'   visits between two consecutive drug dispensing visits.
 #'   Options include "constant", "poisson", "zero-inflated poisson",
 #'   and "negative binomial".
 #' @param model_ti The model for the gap time between two consecutive
-#'   drug dispensing visits. Options include "least squares",
+#'   drug dispensing visits. Options include "least squares"
 #'   and "least absolute deviations".
 #' @param model_di The model for the dispensed doses at drug
 #'   dispensing visits. Options include "constant",

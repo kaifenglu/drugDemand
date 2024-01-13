@@ -14,7 +14,7 @@
 #' consecutive drug dispensing visits.
 #' @param vf_ongoing1 A data frame for the last observed drug dispensing
 #'   date for ongoing patients with drug dispensing records, with or without
-#'   the associated drug information. For common time model, it includes
+#'   the associated drug information. For the common time model, it includes
 #'   the following variables: \code{draw}, \code{usubjid},
 #'   \code{arrivalTime}, \code{treatment}, \code{treatment_description},
 #'   \code{time}, \code{totalTime}, \code{V}, \code{C}, and \code{D}.
@@ -25,7 +25,7 @@
 #'   \code{V}, \code{C}, and \code{D}.
 #' @param vf_new1 A data frame for the randomization date for new patients
 #'   and ongoing patients with no drug dispensing records, with or without the
-#'   associated drug information. For common time model, it includes
+#'   associated drug information. For the common time model, it includes
 #'   the following variables: \code{draw}, \code{usubjid},
 #'   \code{arrivalTime}, \code{treatment}, \code{treatment_description},
 #'   \code{time}, \code{totalTime}, \code{V}, \code{C}, and \code{D}.
@@ -287,7 +287,7 @@ f_dose_draw_t_1 <- function(
 #'   \code{V}, \code{C}, and \code{D}.
 #' @param vf_ongoing1 A data frame for the last observed drug dispensing
 #'   date for ongoing patients with drug dispensing records, with or without
-#'   the associated drug information. For common time model, it includes
+#'   the associated drug information. For the common time model, it includes
 #'   the following variables: \code{draw}, \code{usubjid},
 #'   \code{arrivalTime}, \code{treatment}, \code{treatment_description},
 #'   \code{time}, \code{totalTime}, \code{V}, \code{C}, and \code{D}.
@@ -298,7 +298,7 @@ f_dose_draw_t_1 <- function(
 #'   \code{V}, \code{C}, and \code{D}.
 #' @param vf_new1 A data frame for the randomization date for new patients
 #'   and ongoing patients with no drug dispensing records, with or without the
-#'   associated drug information. For common time model, it includes
+#'   associated drug information. For the common time model, it includes
 #'   the following variables: \code{draw}, \code{usubjid},
 #'   \code{arrivalTime}, \code{treatment}, \code{treatment_description},
 #'   \code{time}, \code{totalTime}, \code{V}, \code{C}, and \code{D}.
@@ -562,8 +562,8 @@ f_dose_draw_1 <- function(
 #'   \code{day}, \code{dose}, \code{cum_dose}, and \code{row_id}.
 #' @param newEvents A data frame containing the imputed event data
 #'   for both ongoing and new patients, typically obtained from
-#'   the output of the \code{eventPred::getPrediction} function.
-#'   It contains the following variables:
+#'   the output of the \code{getPrediction} function of the
+#'   \code{eventPred} package. It contains the following variables:
 #'   \code{draw}, \code{usubjid}, \code{arrivalTime}, \code{treatment},
 #'   \code{treatment_description}, \code{time}, \code{event},
 #'   \code{dropout}, and \code{totalTime}.
