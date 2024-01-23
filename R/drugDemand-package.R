@@ -1,6 +1,7 @@
 #' @name drugDemand-package
 #' @aliases drugDemand-package
-#' @docType package
+#' @keywords internal
+#' "_PACKAGE"
 #'
 #' @title Drug Demand Forecasting
 #'
@@ -98,6 +99,7 @@
 #'   cross_join filter group_by inner_join lead left_join
 #'   mutate n rename row_number select slice summarise tibble
 #' @importFrom plotly add_trace layout plot_ly
+#' @importFrom stringr str_to_title
 #' @importFrom MASS glm.nb
 #' @importFrom nlme lme
 #' @importFrom L1pack lad
@@ -105,8 +107,8 @@
 #' @importFrom foreach %do% %dopar% foreach
 #' @importFrom doParallel registerDoParallel
 #' @importFrom doRNG %dorng%
-#' @importFrom survival Surv survfit
-#' @importFrom stats AIC BIC dnbinom dpois glm lm logLik optimHess
+#' @importFrom survival Surv survfit survreg
+#' @importFrom stats AIC BIC dnbinom dpois glm lm logLik optim optimHess
 #'   pexp plogis plnorm pnorm poisson pweibull quantile rchisq
 #'   rnorm rstandard var vcov
 #' @importFrom erify check_bool check_class check_content check_n
@@ -114,6 +116,7 @@
 #' @importFrom purrr map_dfr
 #' @importFrom eventPred getPrediction
 #' @importFrom tictoc tic toc
+#' @importFrom shiny shinyAppDir
 #'
 NULL
 

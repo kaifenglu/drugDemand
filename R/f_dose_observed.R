@@ -161,6 +161,9 @@ f_dose_observed <- function(
     dplyr::bind_rows(dosing_summary_t) %>%
     dplyr::mutate(date = as.Date(.data$t - 1, origin = trialsdt))
 
+  # convert drug_name to a factor to ensure the correct order
+  ad$drug_name <- factor(ad$drug_name, levels = drug_name)
+
   cum_dispense_plot <- plotly::plot_ly(
     ad, x = ~date, y = ~n, color = ~drug_name, colors = "Set2") %>%
     plotly::add_lines(line = list(shape = "hv", width = 2)) %>%
@@ -203,6 +206,9 @@ f_dose_observed <- function(
   bar_t0_df <- bar_t0_df %>%
     dplyr::left_join(drug_description_df, by = "drug")
 
+  # convert drug_name to a factor to ensure the correct order
+  bar_t0_df$drug_name <- factor(bar_t0_df$drug_name, levels = drug_name)
+
   bar_t0_plot <- plotly::plot_ly(
     bar_t0_df, x = ~y, y = ~n, type = 'bar',
     color = ~drug_name, colors = "Set2") %>%
@@ -217,6 +223,9 @@ f_dose_observed <- function(
   bar_ti_df <- bar_ti_df %>%
     dplyr::left_join(drug_description_df, by = "drug")
 
+  # convert drug_name to a factor to ensure the correct order
+  bar_ti_df$drug_name <- factor(bar_ti_df$drug_name, levels = drug_name)
+
   bar_ti_plot <- plotly::plot_ly(
     bar_ti_df, x = ~y, y = ~n, type = 'bar',
     color = ~drug_name, colors = "Set2") %>%
@@ -230,6 +239,9 @@ f_dose_observed <- function(
   # construct the bar chart for di
   bar_di_df <- bar_di_df %>%
     dplyr::left_join(drug_description_df, by = "drug")
+
+  # convert drug_name to a factor to ensure the correct order
+  bar_di_df$drug_name <- factor(bar_di_df$drug_name, levels = drug_name)
 
   bar_di_plot <- plotly::plot_ly(
     bar_di_df, x = ~y, y = ~n, type = 'bar',

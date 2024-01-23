@@ -2,7 +2,7 @@ Package: drugDemand
 Type: Package
 Title: Drug Demand Forecasting
 Version: 0.1.3
-Date: 2024-01-21
+Date: 2024-01-23
 Authors@R: 
     person("Kaifeng", "Lu", , "kaifenglu@gmail.com", role = c("aut", "cre"),
            comment = c(ORCID = "0000-0002-6160-7119"))
@@ -13,6 +13,7 @@ Imports:
     dplyr (>= 1.1.0),
     rlang (>= 1.1.0),
     purrr (>= 1.0.2),
+    stringr (>= 1.4.0),
     plotly (>= 4.10.1),
     survival (>= 2.41-3),
     mvtnorm (>= 1.1-3),
@@ -26,12 +27,13 @@ Imports:
     foreach (>= 1.5.2),
     doParallel (>= 1.0.17),
     doRNG (>= 1.8.6),
-    tictoc (>= 1.1)
+    tictoc (>= 1.1),
+    shiny (>= 1.7.1)
 LinkingTo: Rcpp
 Depends: 
     R (>= 3.5.0)
 LazyData: true
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.0
 Roxygen: list(markdown = TRUE)
 Encoding: UTF-8
 NeedsCompilation: yes

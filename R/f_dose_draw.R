@@ -2,15 +2,15 @@
 #' @description Simulates drug dispensing visit dates for one iteration.
 #'
 #' @param i The iteration number.
-#' @param fit_k0 The model fit for the number of skipped
+#' @param k0_fit The model fit for the number of skipped
 #' visits between randomization and the first drug dispensing visit.
-#' @param fit_t0 The model fit for the gap time between randomization
+#' @param t0_fit The model fit for the gap time between randomization
 #' and the first drug dispensing visit when there is no visit skipping.
-#' @param fit_t1 The model fit for the gap time between randomization
+#' @param t1_fit The model fit for the gap time between randomization
 #' and the first drug dispensing visit when there is visit skipping.
-#' @param fit_ki The model fit for the number of skipped
+#' @param ki_fit The model fit for the number of skipped
 #' visits between two consecutive drug dispensing visits.
-#' @param fit_ti The model fit for the gap time between two
+#' @param ti_fit The model fit for the gap time between two
 #' consecutive drug dispensing visits.
 #' @param vf_ongoing1 A data frame for the last observed drug dispensing
 #'   date for ongoing patients with drug dispensing records, with or without
@@ -155,8 +155,8 @@
 #'   select(-c(drug, drug_name, dose_unit))
 #'
 #' dosing_subject_new1 <- f_dose_draw_t_1(
-#'   1, fit$fit_k0, fit$fit_t0, fit$fit_t1,
-#'   fit$fit_ki, fit$fit_ti,
+#'   1, fit$k0_fit, fit$t0_fit, fit$t1_fit,
+#'   fit$ki_fit, fit$ti_fit,
 #'   vf_ongoing1, vf_new1)
 #'
 #' head(dosing_subject_new1)
@@ -164,56 +164,56 @@
 #'
 #' @export
 f_dose_draw_t_1 <- function(
-    i, fit_k0, fit_t0, fit_t1,
-    fit_ki, fit_ti,
+    i, k0_fit, t0_fit, t1_fit,
+    ki_fit, ti_fit,
     vf_ongoing1, vf_new1) {
 
-  model_k0 = tolower(fit_k0$fit$model)
+  model_k0 = tolower(k0_fit$fit$model)
   if (model_k0 == "constant") {
-    theta_k0 = fit_k0$theta[i]
+    theta_k0 = k0_fit$theta[i]
   } else if (model_k0 == "poisson") {
-    theta_k0 = exp(fit_k0$theta[i])
+    theta_k0 = exp(k0_fit$theta[i])
   } else if (model_k0 == "zero-inflated poisson") {
-    theta_k0 = c(plogis(fit_k0$theta[i,2]), exp(fit_k0$theta[i,1]))
+    theta_k0 = c(plogis(k0_fit$theta[i,2]), exp(k0_fit$theta[i,1]))
   } else if (model_k0 == "negative binomial") {
-    mu = exp(fit_k0$theta[i,1])
-    size = exp(fit_k0$theta[i,2])
+    mu = exp(k0_fit$theta[i,1])
+    size = exp(k0_fit$theta[i,2])
     prob = size/(size + mu)
     theta_k0 = c(size, prob)
   }
 
-  model_t0 = tolower(fit_t0$fit$model)
+  model_t0 = tolower(t0_fit$fit$model)
   if (model_t0 == "constant") {
-    theta_t0 = fit_t0$theta[i]
+    theta_t0 = t0_fit$theta[i]
   } else if (model_t0 == "exponential") {
-    theta_t0 = exp(fit_t0$theta[i])
+    theta_t0 = exp(t0_fit$theta[i])
   } else if (model_t0 == "weibull") {
-    theta_t0 = c(exp(-fit_t0$theta[i,2]), exp(fit_t0$theta[i,1]))
+    theta_t0 = c(exp(-t0_fit$theta[i,2]), exp(t0_fit$theta[i,1]))
   } else if (model_t0 == "log-logistic") {
-    theta_t0 = c(fit_t0$theta[i,1], exp(fit_t0$theta[i,2]))
+    theta_t0 = c(t0_fit$theta[i,1], exp(t0_fit$theta[i,2]))
   } else if (model_t0 == "log-normal") {
-    theta_t0 = c(fit_t0$theta[i,1], exp(fit_t0$theta[i,2]))
+    theta_t0 = c(t0_fit$theta[i,1], exp(t0_fit$theta[i,2]))
   }
 
-  model_t1 = tolower(fit_t1$fit$model)
-  theta_t1 = c(fit_t1$theta[i,1], fit_t1$theta[i,2])
+  model_t1 = tolower(t1_fit$fit$model)
+  theta_t1 = c(t1_fit$theta[i,1], t1_fit$theta[i,2])
 
-  model_ki = tolower(fit_ki$fit$model)
+  model_ki = tolower(ki_fit$fit$model)
   if (model_ki == "constant") {
-    theta_ki = fit_ki$theta[i]
+    theta_ki = ki_fit$theta[i]
   } else if (model_ki == "poisson") {
-    theta_ki = exp(fit_ki$theta[i])
+    theta_ki = exp(ki_fit$theta[i])
   } else if (model_ki == "zero-inflated poisson") {
-    theta_ki = c(plogis(fit_ki$theta[i,2]), exp(fit_ki$theta[i,1]))
+    theta_ki = c(plogis(ki_fit$theta[i,2]), exp(ki_fit$theta[i,1]))
   } else if (model_ki == "negative binomial") {
-    mu = exp(fit_ki$theta[i,1])
-    size = exp(fit_ki$theta[i,2])
+    mu = exp(ki_fit$theta[i,1])
+    size = exp(ki_fit$theta[i,2])
     prob = size/(size + mu)
     theta_ki = c(size, prob)
   }
 
-  model_ti = tolower(fit_ti$fit$model)
-  theta_ti = c(fit_ti$theta[i,1], fit_ti$theta[i,2])
+  model_ti = tolower(ti_fit$fit$model)
+  theta_ti = c(ti_fit$theta[i,1], ti_fit$theta[i,2])
 
 
   # impute dosing for ongoing patients
@@ -267,17 +267,17 @@ f_dose_draw_t_1 <- function(
 #' @param i The iteration number.
 #' @param common_time_model A Boolean variable that indicates whether
 #'   a common time model is used for drug dispensing visits.
-#' @param fit_k0 The model fit for the number of skipped
+#' @param k0_fit The model fit for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
-#' @param fit_t0 The model fit for the gap time between randomization
+#' @param t0_fit The model fit for the gap time between randomization
 #'   and the first drug dispensing visit when there is no visit skipping.
-#' @param fit_t1 The model fit for the gap time between randomization
+#' @param t1_fit The model fit for the gap time between randomization
 #'   and the first drug dispensing visit when there is visit skipping.
-#' @param fit_ki The model fit for the number of skipped
+#' @param ki_fit The model fit for the number of skipped
 #'   visits between two consecutive drug dispensing visits.
-#' @param fit_ti The model fit for the gap time between two
+#' @param ti_fit The model fit for the gap time between two
 #'   consecutive drug dispensing visits.
-#' @param fit_di The model fit for the dispensed doses at drug
+#' @param di_fit The model fit for the dispensed doses at drug
 #'   dispensing visits.
 #' @param vf_ongoing The observed drug dispensing data for ongoing
 #'   patients with drug dispensing records. It includes the following
@@ -446,8 +446,8 @@ f_dose_draw_t_1 <- function(
 #' # first iteration to extract subject and summary data
 #' list1 <- f_dose_draw_1(
 #'   1, fit$common_time_model,
-#'   fit$fit_k0, fit$fit_t0, fit$fit_t1,
-#'   fit$fit_ki, fit$fit_ti, fit$fit_di,
+#'   fit$k0_fit, fit$t0_fit, fit$t1_fit,
+#'   fit$ki_fit, fit$ti_fit, fit$di_fit,
 #'   vf_ongoing, vf_ongoing1, vf_new1,
 #'   treatment_by_drug_df, l, t)
 #'
@@ -458,16 +458,16 @@ f_dose_draw_t_1 <- function(
 #' @export
 f_dose_draw_1 <- function(
     i, common_time_model,
-    fit_k0, fit_t0, fit_t1,
-    fit_ki, fit_ti, fit_di,
+    k0_fit, t0_fit, t1_fit,
+    ki_fit, ti_fit, di_fit,
     vf_ongoing, vf_ongoing1, vf_new1,
     treatment_by_drug_df, l, t) {
 
   # impute drug dispensing visit dates
   if (common_time_model) {
     dosing_subject_new1 <- f_dose_draw_t_1(
-      i, fit_k0, fit_t0, fit_t1,
-      fit_ki, fit_ti,
+      i, k0_fit, t0_fit, t1_fit,
+      ki_fit, ti_fit,
       vf_ongoing1, vf_new1)
 
     # add drug information for each subject
@@ -482,8 +482,8 @@ f_dose_draw_1 <- function(
     dosing_subject_new2 <- purrr::map_dfr(
       1:l, function(h) {
         f_dose_draw_t_1(
-          i, fit_k0[[h]], fit_t0[[h]], fit_t1[[h]],
-          fit_ki[[h]], fit_ti[[h]],
+          i, k0_fit[[h]], t0_fit[[h]], t1_fit[[h]],
+          ki_fit[[h]], ti_fit[[h]],
           vf_ongoing1 %>% dplyr::filter(.data$drug == h),
           vf_new1 %>% dplyr::filter(.data$drug == h))
       })
@@ -493,11 +493,11 @@ f_dose_draw_1 <- function(
   # impute doses to dispense
   dosing_subject_new3 <- purrr::map_dfr(
     1:l, function(h) {
-      mud = fit_di[[h]]$theta$fixed[i,1]
-      sigmab = fit_di[[h]]$theta$fixed[i,2]
-      sigmae = fit_di[[h]]$theta$fixed[i,3]
-      df_ran = dplyr::tibble(usubjid = fit_di[[h]]$theta$usubjid,
-                             b1 = fit_di[[h]]$theta$random[i,])
+      mud = di_fit[[h]]$theta$fixed[i,1]
+      sigmab = di_fit[[h]]$theta$fixed[i,2]
+      sigmae = di_fit[[h]]$theta$fixed[i,3]
+      df_ran = dplyr::tibble(usubjid = di_fit[[h]]$theta$usubjid,
+                             b1 = di_fit[[h]]$theta$random[i,])
 
       df_ongoing2 <- dosing_subject_new2 %>%
         dplyr::filter(.data$drug == h & .data$status == "ongoing") %>%
@@ -573,17 +573,17 @@ f_dose_draw_1 <- function(
 #'   \code{dose_unit}.
 #' @param common_time_model A Boolean variable that indicates whether
 #'   a common time model is used for drug dispensing visits.
-#' @param fit_k0 The model fit for the number of skipped
+#' @param k0_fit The model fit for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
-#' @param fit_t0 The model fit for the gap time between randomization
+#' @param t0_fit The model fit for the gap time between randomization
 #'   and the first drug dispensing visit when there is no visit skipping.
-#' @param fit_t1 The model fit for the gap time between randomization
+#' @param t1_fit The model fit for the gap time between randomization
 #'   and the first drug dispensing visit when there is visit skipping.
-#' @param fit_ki The model fit for the number of skipped
+#' @param ki_fit The model fit for the number of skipped
 #'   visits between two consecutive drug dispensing visits.
-#' @param fit_ti The model fit for the gap time between two
+#' @param ti_fit The model fit for the gap time between two
 #'   consecutive drug dispensing visits.
-#' @param fit_di The model fit for the dispensed doses at drug
+#' @param di_fit The model fit for the dispensed doses at drug
 #'   dispensing visits.
 #' @param t0 The cutoff date relative to the trial start date.
 #' @param t A vector of new time points for drug dispensing prediction.
@@ -672,8 +672,8 @@ f_dose_draw_1 <- function(
 #' dose_draw <- f_dose_draw(
 #'   df, vf, newEvents, treatment_by_drug_df,
 #'   fit$common_time_model,
-#'   fit$fit_k0, fit$fit_t0, fit$fit_t1,
-#'   fit$fit_ki, fit$fit_ti, fit$fit_di,
+#'   fit$k0_fit, fit$t0_fit, fit$t1_fit,
+#'   fit$ki_fit, fit$ti_fit, fit$di_fit,
 #'   t0, t, ncores_max = 2)
 #'
 #' head(dose_draw$dosing_subject_new)
@@ -684,8 +684,8 @@ f_dose_draw_1 <- function(
 f_dose_draw <- function(
     df, vf, newEvents, treatment_by_drug_df,
     common_time_model,
-    fit_k0, fit_t0, fit_t1,
-    fit_ki, fit_ti, fit_di,
+    k0_fit, t0_fit, t1_fit,
+    ki_fit, ti_fit, di_fit,
     t0, t, ncores_max) {
 
   nreps = length(unique(newEvents$draw))
@@ -778,8 +778,8 @@ f_dose_draw <- function(
   i = 1
   list1 <- f_dose_draw_1(
     i, common_time_model,
-    fit_k0, fit_t0, fit_t1,
-    fit_ki, fit_ti, fit_di,
+    k0_fit, t0_fit, t1_fit,
+    ki_fit, ti_fit, di_fit,
     vf_ongoing, vf_ongoing1, vf_new1,
     treatment_by_drug_df, l, t)
 
@@ -797,8 +797,8 @@ f_dose_draw <- function(
   ) %dorng% {
     f_dose_draw_1(
       i, common_time_model,
-      fit_k0, fit_t0, fit_t1,
-      fit_ki, fit_ti, fit_di,
+      k0_fit, t0_fit, t1_fit,
+      ki_fit, ti_fit, di_fit,
       vf_ongoing, vf_ongoing1, vf_new1,
       treatment_by_drug_df, l, t)$dosing_summary_newi
   }

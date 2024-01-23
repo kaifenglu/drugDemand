@@ -1,6 +1,20 @@
 # drugDemand 0.1.3
 
 - remove the dependence on pscl and icenReg packages
+- add stringr to imported packages
+- add survival::survreg and stats::optim to imported functions
+- use the Brent method for optimization to fit an interval-censored exponential distribution to the time from randomization to the first drug dispensing visit
+- check the number of unique combinations of time and k1 in f_fit_ti
+- use the VarCorr function from the nlme package to obtain the variance of random effects from the lme function call
+- use data from all drugs to inform the common time model
+- convert drug_name to a factor to ensure the correct order when creating a plot
+- add the pred_pp_only parameter to f_drug_demand to make protocol-based predictions only
+- ensure that df and visitview have all the required columns and none of the required columns have missing values if the data sets are provided in the f_drug_demand function call
+- combine dosing_pred_df and dosing_pred_pp in the f_drug_demand output
+- handle cases where all patients in a treatment arm discontinued before the cutoff
+- replace round with formatC to retain the zeros after the decimal point
+- rename fit_xx to xx_fit, where xx = k0, t0, t1, ki, ti, di to be consistent with enroll_fit and event_fit naming convention
+- add drug_name as the sub plot title in f_dispensing_models.R
 
 # drugDemand 0.1.2
 
