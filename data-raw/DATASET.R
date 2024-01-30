@@ -66,7 +66,11 @@ df2 <- tibble(trialsdt = trialsdt,
 drug_description_df = tibble(
   drug = c(1, 2, 3, 4),
   drug_name = c("Drug A", "Drug B", "Drug C", "Placebo"),
-  dose_unit = c("kit", "kit", "kit", "kit"))
+  dose_strength = rep("", 4),
+  kit = c(1, 2, 3, 4),
+  kit_name = c("Drug A", "Drug B", "Drug C", "Placebo"),
+  dose_unit = c("kit", "kit", "kit", "kit"),
+  p_kit = 1)
 
 l = nrow(drug_description_df)
 
@@ -75,7 +79,7 @@ treatment_by_drug = matrix(c(1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1),
                            nrow = 3, ncol = 4, byrow = TRUE)
 
 f_treatment_by_drug_df <- function(
-    treatment_by_drug, drug_name, dose_unit) {
+    treatment_by_drug, drug_name) {
 
   k = nrow(treatment_by_drug)
   l = ncol(treatment_by_drug)
@@ -83,18 +87,16 @@ f_treatment_by_drug_df <- function(
   tibble(treatment = rep(1:k, l),
          drug = rep(1:l, each=k),
          drug_name = rep(drug_name[1:l], each=k),
-         dose_unit = rep(dose_unit[1:l], each=k),
          included = as.logical(treatment_by_drug)) %>%
     filter(included) %>%
-    select(treatment, drug, drug_name, dose_unit)
+    select(treatment, drug, drug_name)
 }
 
 l = nrow(drug_description_df)
 drug_name = drug_description_df$drug_name
-dose_unit = drug_description_df$dose_unit
 
 treatment_by_drug_df <- f_treatment_by_drug_df(
-  treatment_by_drug, drug_name, dose_unit)
+  treatment_by_drug, drug_name)
 
 
 
@@ -254,9 +256,10 @@ vf1 <- purrr::pmap_dfr(
 
 visitview2 <- vf1 %>%
   inner_join(vf, by = c("drug", "usubjid", "visit")) %>%
-  mutate(date = as.Date(day - 1, origin = randdt)) %>%
-  select(usubjid, visit, date, drug, drug_name, dose_unit,
-         kit_number, dispensed_quantity) %>%
+  mutate(date = as.Date(day - 1, origin = randdt),
+         dose_strength = "", dose_unit = "kit") %>%
+  select(usubjid, visit, date, drug, drug_name, dose_strength,
+         dose_unit, kit_number, dispensed_quantity) %>%
   arrange(usubjid, date, kit_number)
 
 
@@ -278,7 +281,7 @@ visitview1 <- visitview2 %>%
   filter(date <= cutoffdt)
 
 dosing_schedule_df = dplyr::tibble(
-  drug = c(1, 2, 3, 4),
+  kit = c(1, 2, 3, 4),
   target_days = c(21, 21, 21, 21),
   target_dose = c(2, 3, 2, 1),
   max_cycles = c(10000, 10000, 10000, 10000))

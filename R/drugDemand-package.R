@@ -96,8 +96,9 @@
 #' @importFrom Rcpp evalCpp
 #' @importFrom mvtnorm pmvnorm rmvnorm
 #' @importFrom dplyr %>% arrange as_tibble bind_cols bind_rows
-#'   cross_join filter group_by inner_join lead left_join
-#'   mutate n rename row_number select slice summarise tibble
+#'   cross_join cur_group_id filter group_by inner_join lead left_join
+#'   mutate n rename right_join row_number select slice summarise tibble
+#'   ungroup
 #' @importFrom plotly add_trace layout plot_ly
 #' @importFrom stringr str_to_title
 #' @importFrom MASS glm.nb
@@ -109,14 +110,13 @@
 #' @importFrom doRNG %dorng%
 #' @importFrom survival Surv survfit survreg
 #' @importFrom stats AIC BIC dnbinom dpois glm lm logLik optim optimHess
-#'   pexp plogis plnorm pnorm poisson pweibull quantile rchisq
-#'   rnorm rstandard var vcov
+#'   pexp plogis plnorm pnorm poisson pweibull quantile rchisq rgamma
+#'   rmultinom rnorm rstandard var vcov
 #' @importFrom erify check_bool check_class check_content check_n
 #' @importFrom rlang .data
 #' @importFrom purrr map_dfr
 #' @importFrom eventPred getPrediction
 #' @importFrom tictoc tic toc
-#' @importFrom shiny shinyAppDir
 #'
 NULL
 

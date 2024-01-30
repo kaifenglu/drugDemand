@@ -4,37 +4,48 @@
 #'
 #' @param treatment_by_drug The indicator matrix of treatment by drug
 #'   combinations.
-#' @param drug_name The name of the drug.
-#' @param dose_unit The dose unit used for drug dispensing.
 #'
 #' @return A data frame indicating the treatments
 #' associated with each drug, including the following variables:
-#' \code{treatment}, \code{drug}, \code{drug_name}, and
-#' \code{dose_unit}.
+#' \code{treatment} and \code{drug}.
+#'
+#' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
+#'
+#' @examples
+#' f_treatment_by_drug_df(treatment_by_drug)
+#'
+#' @export
+f_treatment_by_drug_df <- function(treatment_by_drug) {
+  k = nrow(treatment_by_drug)
+  l = ncol(treatment_by_drug)
+  tibble(treatment = rep(1:k, l),
+         drug = rep(1:l, each = k),
+         included = as.logical(treatment_by_drug)) %>%
+    filter(.data$included) %>%
+    select(c("treatment", "drug"))
+}
+
+
+#' @title Random Number Generator for the Dirichlet Distribution
+#' @description Generates cell probabilities from the Dirichlet distribution.
+#'
+#' @param n The number of observations.
+#' @param alpha The shape parameters of the Dirichlet distribution.
+#'
+#' @return A matrix of n rows and k columns, where n is the number of
+#' observations and k is the number of cells.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
 #' @examples
 #'
-#' drug_name = drug_description_df$drug_name
-#' dose_unit = drug_description_df$dose_unit
-#' f_treatment_by_drug_df(treatment_by_drug, drug_name, dose_unit)
+#' rdirichlet(2, c(50, 20, 30))
 #'
 #' @export
-f_treatment_by_drug_df <- function(
-    treatment_by_drug, drug_name, dose_unit) {
-
-  k = nrow(treatment_by_drug)
-  l = ncol(treatment_by_drug)
-
-  dplyr::tibble(treatment = rep(1:k, l),
-                drug = rep(1:l, each = k),
-                drug_name = rep(drug_name[1:l], each = k),
-                dose_unit = rep(dose_unit[1:l], each = k),
-                included = as.logical(treatment_by_drug)) %>%
-    dplyr::filter(.data$included) %>%
-    dplyr::select(.data$treatment, .data$drug, .data$drug_name,
-                  .data$dose_unit)
+rdirichlet <- function (n = 1, alpha) {
+  Gam <- matrix(0, n, length(alpha))
+  for (i in 1:length(alpha)) Gam[,i] <- rgamma(n, shape = alpha[i])
+  Gam/rowSums(Gam)
 }
 
 
@@ -57,17 +68,18 @@ f_treatment_by_drug_df <- function(
 #' @param visitview A data frame containing the observed drug dispensing
 #'   data, including the following variables:
 #'   \code{usubjid}, \code{visit}, \code{date}, \code{drug},
-#'   \code{drug_name}, \code{dose_unit}, \code{kit_number}, and
-#'   \code{dispensed_quantity}.
+#'   \code{drug_name}, \code{dose_strength}, \code{dose_unit},
+#'   \code{kit_number}, and \code{dispensed_quantity}.
 #' @param drug_description_df The drug description data frame
-#'   including \code{drug}, \code{drug_name}, and \code{dose_unit}.
+#'   including \code{drug}, \code{drug_name}, \code{dose_strength},
+#'   \code{kit}, \code{kit_name}, and \code{dose_unit}.
 #'   It must be specified at the design stage. It will be replaced with
 #'   the observed information at the analysis stage.
 #' @param treatment_by_drug The indicator matrix of treatment by drug
 #'   combinations. It must be specified at the design stage. It will
 #'   be replaced with the observed information at the analysis stage.
 #' @param dosing_schedule_df A data frame providing dosing schedule
-#'   information. It contains the following variables: \code{drug},
+#'   information. It contains the following variables: \code{kit},
 #'   \code{target_days}, \code{target_dose}, and \code{max_cycles}.
 #' @param model_k0 The model for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
@@ -104,10 +116,12 @@ f_treatment_by_drug_df <- function(
 #' @return For design-stage drug demand forecasting, a list with the
 #' following components:
 #'
-#' * \code{dosing_pred_pp}: A data frame for dosing summary by drug and
-#'   time point per protocol. It includes the following variables: \code{drug},
-#'   \code{drug_name}, \code{dose_unit}, \code{t}, \code{n}, \code{pilevel},
-#'   \code{lower}, \code{upper}, \code{mean}, and \code{var}.
+#' * \code{dosing_pred_df}: A data frame for dosing summary by kit type
+#'    and time point per protocol. It includes the following variables:
+#'   \code{kit}, \code{kit_name}, \code{dose_unit},
+#'   \code{t}, \code{n}, \code{pilevel},
+#'   \code{lower}, \code{upper}, \code{mean}, \code{var},
+#'   and \code{parameter}.
 #'
 #' * \code{dosing_pred_plot}: A plot object for dosing prediction.
 #'
@@ -120,11 +134,11 @@ f_treatment_by_drug_df <- function(
 #'
 #' * \code{dosing_summary_t0}: A data frame for the cumulative doses
 #'   dispensed before the cutoff date. It contains the following
-#'   variables: \code{drug}, \code{drug_name}, \code{dose_unit}, and
+#'   variables: \code{kit}, \code{kit_name}, \code{dose_unit}, and
 #'   \code{cum_dose_t0}.
 #'
 #' * \code{cum_dispense_plot}: The step plot for the cumulative doses
-#'   dispensed for each drug.
+#'   dispensed for each kit type.
 #'
 #' * \code{bar_t0_plot}: The bar chart for the time between
 #'   randomization and the first drug dispensing visit.
@@ -160,7 +174,8 @@ f_treatment_by_drug_df <- function(
 #'
 #' * \code{dosing_subject}: A data frame for the observed and imputed
 #'   subject-level dosing records for the first iteration. It includes
-#'   the following variables: \code{drug}, \code{drug_name}, \code{dose_unit},
+#'   the following variables:
+#'   \code{kit}, \code{kit_name}, \code{dose_unit},
 #'   \code{usubjid}, \code{treatment}, \code{treatment_description},
 #'   \code{arrivalTime}, \code{time}, \code{day}, \code{dose},
 #'   \code{cum_dose}, \code{row_id}, \code{subject_type}, \code{imputed},
@@ -168,14 +183,11 @@ f_treatment_by_drug_df <- function(
 #'   \code{date}.
 #'
 #' * \code{dosing_pred_df}: A data frame for dosing summary by drug and
-#'   time point. It includes the following variables: \code{drug},
-#'   \code{drug_name}, \code{dose_unit}, \code{t}, \code{n}, \code{pilevel},
-#'   \code{lower}, \code{upper}, \code{mean}, \code{var}, and \code{date}.
-#'
-#' * \code{dosing_pred_pp}: A data frame for dosing summary by drug and
-#'   time point per protocol. It includes the following variables: \code{drug},
-#'   \code{drug_name}, \code{dose_unit}, \code{t}, \code{n}, \code{pilevel},
-#'   \code{lower}, \code{upper}, \code{mean}, \code{var}, and \code{date}.
+#'   time point. It includes the following variables:
+#'   \code{kit}, \code{kit_name}, \code{dose_unit},
+#'   \code{t}, \code{n}, \code{pilevel},
+#'   \code{lower}, \code{upper}, \code{mean}, \code{var}, \code{date},
+#'   and \code{parameter}.
 #'
 #' * \code{dosing_pred_plot}: A plot object for dosing prediction.
 #'
@@ -249,6 +261,7 @@ f_drug_demand <- function(
     pred_pp_only = FALSE,
     showplot = TRUE) {
 
+  # check if df has the required columns
   if (!is.null(df)) {
     cols = colnames(df)
     req_cols = c("trialsdt", "usubjid", "randdt", "treatment",
@@ -276,10 +289,11 @@ f_drug_demand <- function(
     newEvents$treatment_description = "Treatment 1"
   }
 
+  # check if visitview has the required columns
   if (!is.null(visitview)) {
     cols = colnames(visitview)
-    req_cols = c("usubjid", "date", "drug", "drug_name", "dose_unit",
-                 "dispensed_quantity")
+    req_cols = c("usubjid", "date", "drug", "drug_name", "dose_strength",
+                 "dose_unit", "dispensed_quantity")
 
     if (!all(req_cols %in% cols)) {
       stop(paste("The following columns are missing from visitview:",
@@ -288,17 +302,72 @@ f_drug_demand <- function(
 
     if (any(is.na(visitview[, req_cols]))) {
       stop(paste("The following columns of visitview have missing values:",
-                 paste(req_cols[sapply(visitview, function(x) any(is.na(x)))],
+                 paste(req_cols[sapply(visitview,
+                                       function(x) any(is.na(x)))],
                        collapse = ", ")))
     }
   }
+
+  if (is.null(df) + is.null(visitview) == 1) {
+    stop("df and visitview must be provided at the same time.")
+  }
+
+  if (is.null(df) && is.null(drug_description_df)) {
+    stop("drug_description_df must be provided if df is not provided.")
+  }
+
+  if (is.null(df) && is.null(treatment_by_drug)) {
+    stop("treatment_by_drug must be provided if df is not provided.")
+  }
+
 
   if (is.null(dosing_schedule_df)) {
     stop("dosing_schedule_df must be provided.")
   }
 
-  if (!is.null(visitview) && is.null(df)) {
-    stop("df must be provided if visitview is provided.")
+  # check if drug_description_df has the required columns
+  if (!is.null(drug_description_df)) {
+    cols = colnames(drug_description_df)
+    req_cols = c("drug", "drug_name", "dose_strength", "dose_unit")
+
+    if (is.null(df)) req_cols = c(req_cols, "p_kit")
+
+    if (!all(req_cols %in% cols)) {
+      stop(paste("The following columns are missing from",
+                 "drug_description_df:",
+                 paste(req_cols[!(req_cols %in% cols)], collapse = ", ")))
+    }
+
+    if (any(is.na(drug_description_df[, req_cols]))) {
+      stop(paste("The following columns of drug_description_df",
+                 "have missing values:",
+                 paste(req_cols[sapply(drug_description_df,
+                                       function(x) any(is.na(x)))],
+                       collapse = ", ")))
+    }
+
+    # ensure that the kit probabilities add up to 1 for each drug
+    if ("p_kit" %in% cols) {
+      if (any(drug_description_df$p_kit <= 0)) {
+        stop("p_kit must be positive")
+      }
+
+      df_total_p_kit <- drug_description_df %>%
+        group_by(.data$drug) %>%
+        summarise(total_p_kit = sum(.data$p_kit))
+
+      drug_description_df <- drug_description_df %>%
+        left_join(df_total_p_kit, by = "drug") %>%
+        mutate(p_kit = .data$p_kit/.data$total_p_kit) %>%
+        select(-.data$total_p_kit)
+    }
+
+    # derive the kit information
+    drug_description_df <- drug_description_df %>%
+      arrange(.data$drug, .data$drug_name, .data$dose_strength,
+              .data$dose_unit) %>%
+      mutate(kit = row_number(),
+             kit_name = trimws(paste(.data$drug_name, .data$dose_strength)))
   }
 
   nreps = length(unique(newEvents$draw))
@@ -314,29 +383,29 @@ f_drug_demand <- function(
     observed <- f_dose_observed(df, visitview, showplot = showplot)
     vf = observed$vf
     treatment_by_drug_df = observed$treatment_by_drug_df
-
+    drug_description_df = observed$drug_description_df
     dosing_summary_t = observed$dosing_summary_t %>%
-      dplyr::mutate(pilevel = pilevel)
-
+      mutate(pilevel = pilevel)
     dosing_summary_t0 = observed$dosing_summary_t0
-
-    # extract drug description from observed data
-    drug_description_df <- dosing_summary_t0 %>%
-      dplyr::select(.data$drug, .data$drug_name, .data$dose_unit)
   } else {
+    vf <- NULL
+    treatment_by_drug_df = f_treatment_by_drug_df(treatment_by_drug)
     dosing_summary_t0 = drug_description_df %>%
-      dplyr::mutate(cum_dose_t0 = 0)
+      mutate(cum_dose_t0 = 0) %>%
+      select(-c("drug", "drug_name", "dose_strength"))
   }
 
-  # set up treatment by drug combinations
+  # prepare the dosing data sets to impute for ongoing and new subjects
+  vf_ongoing_new <- f_ongoing_new(newEvents, drug_description_df,
+                                  treatment_by_drug_df, vf)
+
+  vf_ongoing <- vf_ongoing_new$vf_ongoing
+  vf_new <- vf_ongoing_new$vf_new
+
+  # number of kit types
   l = nrow(drug_description_df)
-  drug_name = drug_description_df$drug_name
+  kit_name = drug_description_df$kit_name
   dose_unit = drug_description_df$dose_unit
-
-  if (is.null(visitview)) {
-    treatment_by_drug_df = f_treatment_by_drug_df(
-      treatment_by_drug, drug_name, dose_unit)
-  }
 
   # time points after cutoff to impute dosing data
   t0 = ifelse(is.null(df), 1, as.numeric(cutoffdt - trialsdt + 1))
@@ -344,31 +413,29 @@ f_drug_demand <- function(
   t = c(seq(t0, t1, 30), t1)
 
   # dosing prediction per protocol
-  dosing_pred_pp <- f_dose_pp(dosing_summary_t0, newEvents,
-                              treatment_by_drug_df, dosing_schedule_df,
-                              t0, t, pilevel) %>%
-    dplyr::mutate(parameter = "protocol based prediction")
+  dosing_pred_pp <- f_dose_pp(dosing_summary_t0, vf_ongoing, vf_new,
+                              dosing_schedule_df, t0, t, pilevel) %>%
+    mutate(parameter = "protocol based prediction")
 
   # dosing prediction based on modeling and simulation
   if (!is.null(visitview)) {
     # dosing summary for subjects who discontinued treatment before cutoff
-    dosing_subject_stopped <- vf %>% dplyr::filter(.data$event == 1)
+    dosing_subject_stopped <- vf %>% filter(.data$event == 1)
 
     dosing_summary_stopped <- dosing_subject_stopped %>%
-      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                      .data$usubjid) %>%
-      dplyr::slice(dplyr::n()) %>%
-      dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit) %>%
-      dplyr::summarise(total_dose_a = sum(.data$cum_dose),
-                       .groups = "drop_last")
+      group_by(.data$kit, .data$kit_name, .data$dose_unit,
+               .data$usubjid) %>%
+      slice(n()) %>%
+      group_by(.data$kit, .data$kit_name, .data$dose_unit) %>%
+      summarise(total_dose_a = sum(.data$cum_dose),
+                .groups = "drop_last")
 
-    # add treatment arms for which all patients had discontinued treatment
-    # before cutoff and add date information for prediction per protocol
+    # add arms for which all patients had discontinued treatment before cutoff
     dosing_pred_pp <- dosing_summary_stopped %>%
-      cross_join(dplyr::tibble(t = t, pilevel = pilevel,
-                               parameter = "protocol based prediction")) %>%
+      cross_join(tibble(t = t, pilevel = pilevel,
+                        parameter = "protocol based prediction")) %>%
       left_join(dosing_pred_pp,
-                by = c("drug", "drug_name", "dose_unit", "t",
+                by = c("kit", "kit_name", "dose_unit", "t",
                        "pilevel", "parameter")) %>%
       mutate(miss = is.na(.data$n)) %>%
       mutate(n = ifelse(.data$miss, .data$total_dose_a, .data$n),
@@ -376,14 +443,14 @@ f_drug_demand <- function(
              upper = ifelse(.data$miss, .data$total_dose_a, .data$upper),
              mean = ifelse(.data$miss, .data$total_dose_a, .data$mean),
              var = ifelse(.data$miss, 0, .data$var)) %>%
-      dplyr::mutate(date = as.Date(.data$t - 1, origin = trialsdt)) %>%
-      dplyr::select(-.data$total_dose_a, -.data$miss)
+      mutate(date = as.Date(.data$t - 1, origin = trialsdt)) %>%
+      select(-c("total_dose_a", "miss"))
 
     # initialize the dosing plot data set
-    df0 <- dplyr::tibble(drug = 1:l, drug_name = drug_name,
-                         dose_unit = dose_unit, t = 1, n = 0,
-                         pilevel = pilevel, lower = NA, upper = NA,
-                         mean = 0, var = 0)
+    df0 <- tibble(kit = 1:l, kit_name = kit_name,
+                  dose_unit = dose_unit, t = 1, n = 0,
+                  pilevel = pilevel, lower = NA, upper = NA,
+                  mean = 0, var = 0)
 
     if (!pred_pp_only) {
       # model fit to the observed drug dispensing data
@@ -393,7 +460,7 @@ f_drug_demand <- function(
                                  nreps, showplot)
 
       # impute drug dispensing data for ongoing and new patients
-      a <- f_dose_draw(df, vf, newEvents, treatment_by_drug_df,
+      a <- f_dose_draw(vf_ongoing, vf_new,
                        fit$common_time_model,
                        fit$k0_fit, fit$t0_fit, fit$t1_fit,
                        fit$ki_fit, fit$ti_fit, fit$di_fit,
@@ -401,22 +468,22 @@ f_drug_demand <- function(
 
       # subject level dosing data for the first simulation run
       dosing_subject <- dosing_subject_stopped %>%
-        dplyr::select(-c(.data$event, .data$dropout)) %>%
-        dplyr::bind_rows(
+        select(-c("event", "dropout")) %>%
+        bind_rows(
           a$dosing_subject_new %>%
-            dplyr::select(-c(.data$draw, .data$totalTime)) %>%
-            dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                            .data$usubjid) %>%
-            dplyr::mutate(cum_dose = cumsum(.data$dose),
-                          row_id = dplyr::row_number())) %>%
-        dplyr::mutate(
+            select(-c("draw", "totalTime")) %>%
+            group_by(.data$kit, .data$kit_name, .data$dose_unit,
+                     .data$usubjid) %>%
+            mutate(cum_dose = cumsum(.data$dose),
+                   row_id = row_number())) %>%
+        mutate(
           subject_type = ifelse(
             .data$arrivalTime + .data$time - 1 <= t0, "discontinued",
             ifelse(.data$arrivalTime <= t0, "ongoing", "new")),
           imputed = ifelse(.data$arrivalTime + .data$day - 1 > t0, 1, 0)) %>%
-        dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit,
-                       .data$usubjid, .data$day) %>%
-        dplyr::mutate(
+        arrange(.data$kit, .data$kit_name, .data$dose_unit,
+                .data$usubjid, .data$day) %>%
+        mutate(
           trialsdt = trialsdt,
           cutoffdt = cutoffdt,
           randdt = as.Date(.data$arrivalTime - 1, origin = trialsdt),
@@ -426,52 +493,52 @@ f_drug_demand <- function(
       # set total_dose_b = 0 for treatment arms for which
       # all patients had discontinued treatment before cutoff
       dosing_summary_new <- drug_description_df %>%
-        cross_join(dplyr::tibble(draw = rep(1:nreps, each = length(t)),
-                                 t = rep(t, nreps))) %>%
+        cross_join(tibble(draw = rep(1:nreps, each = length(t)),
+                          t = rep(t, nreps))) %>%
         left_join(a$dosing_summary_new,
-                  by = c("drug", "drug_name", "dose_unit",
+                  by = c("kit", "kit_name", "dose_unit",
                          "draw", "t")) %>%
         mutate(total_dose_b = ifelse(is.na(.data$total_dose_b), 0,
                                      .data$total_dose_b))
 
       # add summary from patients who had discontinued treatment before cutoff
       dosing_summary <- dosing_summary_new %>%
-        dplyr::right_join(dosing_summary_stopped,
-                          by = c("drug", "drug_name", "dose_unit")) %>%
-        dplyr::mutate(total_dose = .data$total_dose_a +
-                        ifelse(is.na(.data$total_dose_b), 0,
-                               .data$total_dose_b))
+        right_join(dosing_summary_stopped,
+                   by = c("kit", "kit_name", "dose_unit")) %>%
+        mutate(total_dose = .data$total_dose_a +
+                 ifelse(is.na(.data$total_dose_b), 0,
+                        .data$total_dose_b))
 
       # dosing overview by drug, t
       dosing_overview <- dosing_summary %>%
-        dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                        .data$t) %>%
-        dplyr::summarise(n = quantile(.data$total_dose, probs = 0.5),
-                         pilevel = pilevel,
-                         lower = quantile(.data$total_dose,
-                                          probs = (1 - pilevel)/2),
-                         upper = quantile(.data$total_dose,
-                                          probs = (1 + pilevel)/2),
-                         mean = mean(.data$total_dose),
-                         var = var(.data$total_dose),
-                         .groups = 'drop_last')
+        group_by(.data$kit, .data$kit_name, .data$dose_unit,
+                 .data$t) %>%
+        summarise(n = quantile(.data$total_dose, probs = 0.5),
+                  pilevel = pilevel,
+                  lower = quantile(.data$total_dose,
+                                   probs = (1 - pilevel)/2),
+                  upper = quantile(.data$total_dose,
+                                   probs = (1 + pilevel)/2),
+                  mean = mean(.data$total_dose),
+                  var = var(.data$total_dose),
+                  .groups = 'drop_last')
 
       # combine with the prediction results
       dosing_pred_df <- df0 %>%
-        dplyr::bind_rows(dosing_summary_t) %>%
-        dplyr::bind_rows(dosing_overview) %>%
-        dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit,
-                       .data$t) %>%
-        dplyr::mutate(date = as.Date(.data$t - 1, origin = trialsdt))
+        bind_rows(dosing_summary_t) %>%
+        bind_rows(dosing_overview) %>%
+        arrange(.data$kit, .data$kit_name, .data$dose_unit,
+                .data$t) %>%
+        mutate(date = as.Date(.data$t - 1, origin = trialsdt))
     } else {
       dosing_subject <- vf %>%
-        dplyr::mutate(
+        mutate(
           subject_type = ifelse(.data$event == 1, "discontinued", "ongoing"),
           imputed = 0) %>%
-        dplyr::select(-c(.data$event, .data$dropout)) %>%
-        dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit,
-                       .data$usubjid, .data$day) %>%
-        dplyr::mutate(
+        select(-c("event", "dropout")) %>%
+        arrange(.data$kit, .data$kit_name, .data$dose_unit,
+                .data$usubjid, .data$day) %>%
+        mutate(
           trialsdt = trialsdt,
           cutoffdt = cutoffdt,
           randdt = as.Date(.data$arrivalTime - 1, origin = trialsdt),
@@ -479,17 +546,17 @@ f_drug_demand <- function(
           date = as.Date(.data$day - 1, origin = .data$randdt))
 
       dosing_pred_df <- df0 %>%
-        dplyr::bind_rows(dosing_summary_t) %>%
-        dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit,
-                       .data$t) %>%
-        dplyr::mutate(date = as.Date(.data$t - 1, origin = trialsdt))
+        bind_rows(dosing_summary_t) %>%
+        arrange(.data$kit, .data$kit_name, .data$dose_unit,
+                .data$t) %>%
+        mutate(date = as.Date(.data$t - 1, origin = trialsdt))
     }
 
     dosing_pred_df <- dosing_pred_df %>%
-      dplyr::mutate(parameter = ifelse(is.na(.data$lower), "observed data",
-                                       "model based prediction")) %>%
-      dplyr::bind_rows(dosing_pred_pp) %>%
-      dplyr::arrange(.data$drug, .data$drug_name, .data$dose_unit, .data$t)
+      mutate(parameter = ifelse(is.na(.data$lower), "observed data",
+                                "model based prediction")) %>%
+      bind_rows(dosing_pred_pp) %>%
+      arrange(.data$kit, .data$kit_name, .data$dose_unit, .data$t)
   } else {
     dosing_pred_df <- dosing_pred_pp
   }
@@ -499,8 +566,9 @@ f_drug_demand <- function(
   fig <- list()
   if (is.null(df)) { # design stage
     for (j in 1:l) {
-      dfb_pp <- dplyr::filter(dosing_pred_df, .data$drug == j &
-                                .data$parameter == "protocol based prediction")
+      dfb_pp <- filter(dosing_pred_df, .data$kit == j &
+                         .data$parameter ==
+                         "protocol based prediction")
 
       fig[[j]] <- plotly::plot_ly() %>%
         plotly::add_lines(
@@ -517,18 +585,19 @@ f_drug_demand <- function(
                        zeroline = FALSE),
           annotations = list(
             x = 0.5, y = 1,
-            text = paste0("<b>", dfb_pp$drug_name[1], "</b>"),
+            text = paste0("<b>", dfb_pp$kit_name[1], "</b>"),
             xanchor = "center", yanchor = "bottom",
             showarrow = FALSE, xref = 'paper', yref = 'paper'))
     }
   } else {
     for (j in 1:l) {
-      dfa <- dplyr::filter(dosing_pred_df, .data$drug == j &
-                             .data$parameter == "observed data")
-      dfb <- dplyr::filter(dosing_pred_df, .data$drug == j &
-                             .data$parameter == "model based prediction")
-      dfb_pp <- dplyr::filter(dosing_pred_df, .data$drug == j &
-                                .data$parameter == "protocol based prediction")
+      dfa <- filter(dosing_pred_df, .data$kit == j &
+                      .data$parameter == "observed data")
+      dfb <- filter(dosing_pred_df, .data$kit == j &
+                      .data$parameter == "model based prediction")
+      dfb_pp <- filter(dosing_pred_df, .data$kit == j &
+                         .data$parameter ==
+                         "protocol based prediction")
 
       fig[[j]] <- plotly::plot_ly() %>%
         plotly::add_lines(
@@ -560,7 +629,7 @@ f_drug_demand <- function(
                        zeroline = FALSE),
           annotations = list(
             x = 0.5, y = 1,
-            text = paste0("<b>", dfa$drug_name[1], "</b>"),
+            text = paste0("<b>", dfa$kit_name[1], "</b>"),
             xanchor = "center", yanchor = "bottom",
             showarrow = FALSE, xref = 'paper', yref = 'paper'))
 

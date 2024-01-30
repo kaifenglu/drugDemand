@@ -34,21 +34,22 @@ f_cum_dose <- function(x, w, d, N) {
 #'
 #' @param dosing_summary_t0 A data frame for the cumulative doses
 #'   dispensed before the cutoff date. It contains the following
-#'   variables: \code{drug}, \code{drug_name}, \code{dose_unit},
+#'   variables: \code{kit}, \code{kit_name}, \code{dose_unit},
 #'   and \code{cum_dose_t0}.
-#' @param newEvents A data frame containing the imputed event data
-#'   for both ongoing and new patients, typically obtained from
-#'   the output of the \code{getPrediction} function of the
-#'   \code{eventPred} package. It contains the following variables:
-#'   \code{draw}, \code{usubjid}, \code{arrivalTime}, \code{treatment},
-#'   \code{treatment_description}, \code{time}, \code{event},
-#'   \code{dropout}, and \code{totalTime}.
-#' @param treatment_by_drug_df A data frame indicating the treatments
-#'   associated with each drug, including the following variables:
-#'   \code{treatment}, \code{drug}, \code{drug_name}, and
-#'   \code{dose_unit}.
+#' @param vf_ongoing The observed drug dispensing data for ongoing
+#'   patients with drug dispensing records. It includes the following
+#'   variables: \code{draw}, \code{kit}, \code{kit_name}, \code{dose_unit},
+#'   \code{usubjid}, \code{day}, \code{dose}, \code{arrivalTime},
+#'   \code{treatment}, \code{treatment_description},
+#'   \code{time}, and \code{totalTime}.
+#' @param vf_new A data frame for the randomization date for new patients
+#'   and ongoing patients with no drug dispensing records.
+#'   It includes the following variables:
+#'   \code{draw}, \code{kit}, \code{kit_name}, \code{dose_unit},
+#'   \code{usubjid}, \code{arrivalTime}, \code{treatment},
+#'   \code{treatment_description}, \code{time}, and \code{totalTime}.
 #' @param dosing_schedule_df A data frame providing dosing schedule
-#'   information. It contains the following variables: \code{drug},
+#'   information. It contains the following variables: \code{kit},
 #'   \code{target_days}, \code{target_dose}, and \code{max_cycles}.
 #' @param t0 The cutoff date relative to the trial start date.
 #' @param t A vector of new time points for drug dispensing prediction.
@@ -56,7 +57,7 @@ f_cum_dose <- function(x, w, d, N) {
 #'
 #' @return A data frame for dosing summary by drug and time point per
 #' protocol. It contains the following variables:
-#' \code{drug}, \code{drug_name}, \code{dose_unit}, \code{t}, \code{n},
+#' \code{kit}, \code{kit_name}, \code{dose_unit}, \code{t}, \code{n},
 #' \code{pilevel}, \code{lower}, \code{upper}, \code{mean},
 #' and \code{var}.
 #'
@@ -69,9 +70,6 @@ f_cum_dose <- function(x, w, d, N) {
 #'
 #' set.seed(312)
 #' library(dplyr)
-#'
-#' dosing_summary_t0 = drug_description_df %>%
-#'   dplyr::mutate(cum_dose_t0 = 0)
 #'
 #' pred <- eventPred::getPrediction(
 #'   df = NULL,
@@ -108,10 +106,14 @@ f_cum_dose <- function(x, w, d, N) {
 #'
 #' newEvents <- pred$event_pred$newEvents
 #'
-#' drug_name = drug_description_df$drug_name
-#' dose_unit = drug_description_df$dose_unit
-#' treatment_by_drug_df <- f_treatment_by_drug_df(
-#'   treatment_by_drug, drug_name, dose_unit)
+#' dosing_summary_t0 = drug_description_df %>%
+#'   mutate(cum_dose_t0 = 0) %>%
+#'   select(-c("drug", "drug_name", "dose_strength"))
+#'
+#' treatment_by_drug_df = f_treatment_by_drug_df(treatment_by_drug)
+#'
+#' vf_ongoing_new <- f_ongoing_new(
+#'   newEvents, drug_description_df, treatment_by_drug_df, NULL)
 #'
 #' t0 = 1
 #' nyears = 3
@@ -120,85 +122,89 @@ f_cum_dose <- function(x, w, d, N) {
 #' pilevel = 0.95
 #'
 #' dosing_pred_pp <- f_dose_pp(
-#'   dosing_summary_t0, newEvents,
-#'   treatment_by_drug_df, dosing_schedule_df,
-#'   t0, t, pilevel)
+#'   dosing_summary_t0, vf_ongoing_new$vf_ongoing,
+#'   vf_ongoing_new$vf_new, dosing_schedule_df, t0, t, pilevel)
 #'
 #' head(dosing_pred_pp)
 #' }
 #'
 #' @export
-f_dose_pp <- function(dosing_summary_t0, newEvents,
-                      treatment_by_drug_df, dosing_schedule_df,
-                      t0, t, pilevel) {
+f_dose_pp <- function(dosing_summary_t0, vf_ongoing, vf_new,
+                      dosing_schedule_df, t0, t, pilevel) {
+
+  if (!is.null(vf_ongoing)) {
+    df_ongoing <- vf_ongoing %>%
+      group_by(.data$kit, .data$kit_name, .data$dose_unit,
+               .data$draw, .data$usubjid) %>%
+      slice(1) %>%
+      select(-c("day", "dose"))
+
+    if (!is.null(vf_new)) {
+      df_ongoing <- df_ongoing %>%
+        bind_rows(vf_new %>% filter(.data$arrivalTime <= t0))
+    }
+  } else {
+    df_ongoing <- NULL
+  }
+
+  if (!is.null(vf_new)) {
+    df_new <- vf_new %>% filter(.data$arrivalTime > t0)
+  } else {
+    df_new <- NULL
+  }
 
   purrr::map_dfr(
-    1:length(unique(treatment_by_drug_df$drug)), function(h) {
-      w = dosing_schedule_df$target_days[dosing_schedule_df$drug == h]
-      d = dosing_schedule_df$target_dose[dosing_schedule_df$drug == h]
-      N = dosing_schedule_df$max_cycles[dosing_schedule_df$drug == h]
-
-      # treatments associated with the drug
-      drug1 <- treatment_by_drug_df %>% dplyr::filter(.data$drug == h)
-
-      # predicted event dates for ongoing patients
-      df_ongoing <- newEvents %>%
-        dplyr::filter(.data$arrivalTime <= t0 & .data$totalTime > t0) %>%
-        dplyr::inner_join(drug1, by = "treatment") %>%
-        dplyr::select(-c(.data$treatment, .data$treatment_description,
-                         .data$event, .data$dropout))
-
-      # predicted enrollment and event dates for new patients
-      df_new <- newEvents %>%
-        dplyr::filter(.data$arrivalTime > t0) %>%
-        dplyr::inner_join(drug1, by = "treatment") %>%
-        dplyr::select(-c(.data$treatment, .data$treatment_description,
-                         .data$event, .data$dropout))
+    1:length(unique(dosing_schedule_df$kit)), function(h) {
+      w = dosing_schedule_df$target_days[dosing_schedule_df$kit == h]
+      d = dosing_schedule_df$target_dose[dosing_schedule_df$kit == h]
+      N = dosing_schedule_df$max_cycles[dosing_schedule_df$kit == h]
 
       # predicted drugs to dispense for ongoing subjects
-      dfa = dplyr::tibble(t = t) %>%
-        dplyr::cross_join(df_ongoing) %>%
-        dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                        .data$t, .data$draw) %>%
-        dplyr::summarise(dose_a = sum(
-          f_cum_dose(pmin(.data$totalTime, .data$t) - .data$arrivalTime,
-                     w, d, N) -
-            f_cum_dose(t0 - .data$arrivalTime, w, d, N)),
-          .groups = "drop_last")
+      if (!is.null(df_ongoing)) {
+        dfa <- tibble(t = t) %>%
+          cross_join(df_ongoing %>% filter(.data$kit == h)) %>%
+          group_by(.data$kit, .data$kit_name, .data$dose_unit,
+                   .data$t, .data$draw) %>%
+          summarise(inc_dose = sum(
+            f_cum_dose(pmin(.data$totalTime, .data$t) - .data$arrivalTime,
+                       w, d, N) -
+              f_cum_dose(t0 - .data$arrivalTime, w, d, N)),
+            .groups = "drop_last")
+      } else {
+        dfa <- NULL
+      }
 
       # predicted drugs to dispense for new subjects
-      dfb = dplyr::tibble(t = t) %>%
-        dplyr::cross_join(df_new) %>%
-        dplyr::filter(.data$arrivalTime <= t) %>%
-        dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                        .data$t, .data$draw) %>%
-        dplyr::summarise(dose_b = sum(
-          f_cum_dose(pmin(.data$totalTime, .data$t) - .data$arrivalTime,
-                     w, d, N)),
-          .groups = "drop_last")
+      if (!is.null(df_new)) {
+        dfb <- tibble(t = t) %>%
+          cross_join(df_new %>% filter(.data$kit == h)) %>%
+          filter(.data$arrivalTime <= t) %>%
+          group_by(.data$kit, .data$kit_name, .data$dose_unit,
+                   .data$t, .data$draw) %>%
+          summarise(inc_dose = sum(
+            f_cum_dose(pmin(.data$totalTime, .data$t) - .data$arrivalTime,
+                       w, d, N)),
+            .groups = "drop_last")
+      } else {
+        dfb <- NULL
+      }
 
       # obtain the total doses by time point
-      dosing_summary <- dfa %>%
-        dplyr::full_join(dfb, by = c("drug", "drug_name", "dose_unit",
-                                     "t", "draw")) %>%
-        dplyr::left_join(dosing_summary_t0, by = c('drug', 'drug_name',
-                                                   'dose_unit')) %>%
-        dplyr::mutate(total_dose = .data$cum_dose_t0 +
-                        ifelse(is.na(.data$dose_a), 0, .data$dose_a) +
-                        ifelse(is.na(.data$dose_b), 0, .data$dose_b))
-
-      # obtain summary statistics for predicted total doses
-      dosing_summary %>%
-        dplyr::group_by(.data$drug, .data$drug_name, .data$dose_unit,
-                        .data$t) %>%
-        dplyr::summarise(n = quantile(.data$total_dose, probs = 0.5),
-                         pilevel = pilevel,
-                         lower = quantile(.data$total_dose,
-                                          probs = (1 - pilevel)/2),
-                         upper = quantile(.data$total_dose,
-                                          probs = (1 + pilevel)/2),
-                         mean = mean(.data$total_dose),
-                         var = var(.data$total_dose),
-                         .groups = 'drop_last')
+      dosing_summary <- bind_rows(dfa, dfb) %>%
+        group_by(.data$kit, .data$kit_name, .data$dose_unit,
+                 .data$t, .data$draw) %>%
+        summarise(inc_dose = sum(.data$inc_dose),
+                  .groups = "drop_last") %>%
+        left_join(dosing_summary_t0,
+                  by = c("kit", "kit_name", "dose_unit")) %>%
+        mutate(total_dose = .data$cum_dose_t0 + .data$inc_dose) %>%
+        group_by(.data$kit, .data$kit_name, .data$dose_unit, .data$t) %>%
+        summarise(n = quantile(.data$total_dose, probs = 0.5),
+                  pilevel = pilevel,
+                  lower = quantile(.data$total_dose, probs = (1 - pilevel)/2),
+                  upper = quantile(.data$total_dose, probs = (1 + pilevel)/2),
+                  mean = mean(.data$total_dose),
+                  var = var(.data$total_dose),
+                  .groups = "drop_last")
     })
 }
