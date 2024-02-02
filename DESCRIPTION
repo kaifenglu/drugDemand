@@ -34,5 +34,7 @@ Depends:
 LazyData: true
 RoxygenNote: 7.3.0
 Roxygen: list(markdown = TRUE)
+URL: https://github.com/kaifenglu/drugDemand
+BugReports: https://github.com/kaifenglu/drugDemand/issues
 Encoding: UTF-8
 NeedsCompilation: yes
