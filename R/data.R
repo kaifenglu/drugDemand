@@ -1,28 +1,25 @@
-#' The drug description data frame.
+#' The kit description data frame.
 #'
 #' A data frame with the following columns:
 #' \describe{
 #'   \item{\code{drug}}{The numeric code of the drug.}
 #'   \item{\code{drug_name}}{The name of the drug.}
-#'   \item{\code{dose_strength}}{The dose strength of the kit type.}
 #'   \item{\code{kit}}{The numeric code of the kit type.}
 #'   \item{\code{kit_name}}{The name of the kit type.}
-#'   \item{\code{dose_unit}}{The dose unit for drug dispensing.}
 #'   \item{\code{p_kit}}{The prior probability of different kit types
 #'   within a drug.}
 #' }
-#' For drug demand forecasting, the default dose unit is "kit" for all drugs.
-"drug_description_df"
+"kit_description_df"
 
 
-#' The indicator matrix of treatment by drug combinations.
+#' The data frame indicating the treatments associated with each drug.
 #'
-#' A matrix with dimensions k x l, where k represents the
-#' number of treatment groups, and l represents the number
-#' of drugs. In this matrix, a value of 1 signifies the presence of
-#' the drug within a treatment group, while a value of 0 indicates
-#' the absence of the drug in that particular treatment group.
-"treatment_by_drug"
+#' A data frame with the following columns:
+#' \describe{
+#'   \item{\code{treatment}}{The numeric code of the treatment group.}
+#'   \item{\code{drug}}{The numeric code of the drug.}
+#'  }
+"treatment_by_drug_df"
 
 
 #' The dosing schedule data frame.
@@ -90,8 +87,8 @@
 #'   \item{\code{date}}{The date of the drug dispensing visit.}
 #'   \item{\code{drug}}{The numeric code of the drug.}
 #'   \item{\code{drug_name}}{The name of the drug.}
-#'   \item{\code{dose_strength}}{The dose strength of the kit type.}
-#'   \item{\code{dose_unit}}{The dose unit for drug dispensing.}
+#'   \item{\code{kit}}{The numeric code of the kit type.}
+#'   \item{\code{kit_name}}{The name of the kit type.}
 #'   \item{\code{kit_number}}{The kit number for drug dispensing.}
 #'   \item{\code{dispensed_quantity}}{The number of kits dispensed
 #'   at the visit.}
@@ -108,8 +105,8 @@
 #'   \item{\code{date}}{The date of the drug dispensing visit.}
 #'   \item{\code{drug}}{The numeric code of the drug.}
 #'   \item{\code{drug_name}}{The name of the drug.}
-#'   \item{\code{dose_strength}}{The dose strength of the kit type.}
-#'   \item{\code{dose_unit}}{The dose unit for drug dispensing.}
+#'   \item{\code{kit}}{The numeric code of the kit type.}
+#'   \item{\code{kit_name}}{The name of the kit type.}
 #'   \item{\code{kit_number}}{The kit number for drug dispensing.}
 #'   \item{\code{dispensed_quantity}}{The number of kits dispensed
 #'   at the visit.}

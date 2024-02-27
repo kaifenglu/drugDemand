@@ -34,32 +34,32 @@ f_cum_dose <- function(x, w, d, N) {
 #'
 #' @param dosing_summary_t0 A data frame for the cumulative doses
 #'   dispensed before the cutoff date. It contains the following
-#'   variables: \code{kit}, \code{kit_name}, \code{dose_unit},
-#'   and \code{cum_dose_t0}.
-#' @param vf_ongoing The observed drug dispensing data for ongoing
-#'   patients with drug dispensing records. It includes the following
-#'   variables: \code{draw}, \code{kit}, \code{kit_name}, \code{dose_unit},
-#'   \code{usubjid}, \code{day}, \code{dose}, \code{arrivalTime},
-#'   \code{treatment}, \code{treatment_description},
-#'   \code{time}, and \code{totalTime}.
-#' @param vf_new A data frame for the randomization date for new patients
-#'   and ongoing patients with no drug dispensing records.
+#'   variables:
+#'   \code{kit}, \code{kit_name}, and \code{cum_dose_t0}.
+#' @param vf_ongoing A data frame for the observed drug dispensing
+#'   data for ongoing patients with drug dispensing records.
 #'   It includes the following variables:
-#'   \code{draw}, \code{kit}, \code{kit_name}, \code{dose_unit},
-#'   \code{usubjid}, \code{arrivalTime}, \code{treatment},
+#'   \code{draw}, \code{kit}, \code{kit_name}, \code{usubjid},
+#'   \code{day}, \code{dose}, \code{arrivalTime}, \code{treatment},
 #'   \code{treatment_description}, \code{time}, and \code{totalTime}.
+#' @param vf_new A data frame for the randomization date for new
+#'   patients and ongoing patients with no drug dispensing records.
+#'   It includes the following variables:
+#'   \code{draw}, \code{kit}, \code{kit_name}, \code{usubjid},
+#'   \code{arrivalTime}, \code{treatment}, \code{treatment_description},
+#'   \code{time}, and \code{totalTime}.
 #' @param dosing_schedule_df A data frame providing dosing schedule
-#'   information. It contains the following variables: \code{kit},
-#'   \code{target_days}, \code{target_dose}, and \code{max_cycles}.
+#'   information. It contains the following variables:
+#'   \code{kit}, \code{target_days}, \code{target_dose}, and
+#'   \code{max_cycles}.
 #' @param t0 The cutoff date relative to the trial start date.
 #' @param t A vector of new time points for drug dispensing prediction.
 #' @param pilevel The prediction interval level.
 #'
 #' @return A data frame for dosing summary by drug and time point per
 #' protocol. It contains the following variables:
-#' \code{kit}, \code{kit_name}, \code{dose_unit}, \code{t}, \code{n},
-#' \code{pilevel}, \code{lower}, \code{upper}, \code{mean},
-#' and \code{var}.
+#' \code{kit}, \code{kit_name}, \code{t}, \code{n}, \code{pilevel},
+#' \code{lower}, \code{upper}, \code{mean}, and \code{var}.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -104,16 +104,13 @@ f_cum_dose <- function(x, w, d, N) {
 #'                       "Drug C + Placebo",
 #'                       "Drug A + Placebo"))
 #'
-#' newEvents <- pred$event_pred$newEvents
-#'
-#' dosing_summary_t0 = drug_description_df %>%
+#' dosing_summary_t0 = kit_description_df %>%
 #'   mutate(cum_dose_t0 = 0) %>%
-#'   select(-c("drug", "drug_name", "dose_strength"))
-#'
-#' treatment_by_drug_df = f_treatment_by_drug_df(treatment_by_drug)
+#'   select(-c("drug", "drug_name"))
 #'
 #' vf_ongoing_new <- f_ongoing_new(
-#'   newEvents, drug_description_df, treatment_by_drug_df, NULL)
+#'   pred$event_pred$newEvents, kit_description_df,
+#'   treatment_by_drug_df, NULL)
 #'
 #' t0 = 1
 #' nyears = 3
@@ -134,8 +131,7 @@ f_dose_pp <- function(dosing_summary_t0, vf_ongoing, vf_new,
 
   if (!is.null(vf_ongoing)) {
     df_ongoing <- vf_ongoing %>%
-      group_by(.data$kit, .data$kit_name, .data$dose_unit,
-               .data$draw, .data$usubjid) %>%
+      group_by(.data$kit, .data$kit_name, .data$draw, .data$usubjid) %>%
       slice(1) %>%
       select(-c("day", "dose"))
 
@@ -163,8 +159,7 @@ f_dose_pp <- function(dosing_summary_t0, vf_ongoing, vf_new,
       if (!is.null(df_ongoing)) {
         dfa <- tibble(t = t) %>%
           cross_join(df_ongoing %>% filter(.data$kit == h)) %>%
-          group_by(.data$kit, .data$kit_name, .data$dose_unit,
-                   .data$t, .data$draw) %>%
+          group_by(.data$kit, .data$kit_name, .data$t, .data$draw) %>%
           summarise(inc_dose = sum(
             f_cum_dose(pmin(.data$totalTime, .data$t) - .data$arrivalTime,
                        w, d, N) -
@@ -179,8 +174,7 @@ f_dose_pp <- function(dosing_summary_t0, vf_ongoing, vf_new,
         dfb <- tibble(t = t) %>%
           cross_join(df_new %>% filter(.data$kit == h)) %>%
           filter(.data$arrivalTime <= t) %>%
-          group_by(.data$kit, .data$kit_name, .data$dose_unit,
-                   .data$t, .data$draw) %>%
+          group_by(.data$kit, .data$kit_name, .data$t, .data$draw) %>%
           summarise(inc_dose = sum(
             f_cum_dose(pmin(.data$totalTime, .data$t) - .data$arrivalTime,
                        w, d, N)),
@@ -190,15 +184,13 @@ f_dose_pp <- function(dosing_summary_t0, vf_ongoing, vf_new,
       }
 
       # obtain the total doses by time point
-      dosing_summary <- bind_rows(dfa, dfb) %>%
-        group_by(.data$kit, .data$kit_name, .data$dose_unit,
-                 .data$t, .data$draw) %>%
+      bind_rows(dfa, dfb) %>%
+        group_by(.data$kit, .data$kit_name, .data$t, .data$draw) %>%
         summarise(inc_dose = sum(.data$inc_dose),
                   .groups = "drop_last") %>%
-        left_join(dosing_summary_t0,
-                  by = c("kit", "kit_name", "dose_unit")) %>%
+        left_join(dosing_summary_t0, by = c("kit", "kit_name")) %>%
         mutate(total_dose = .data$cum_dose_t0 + .data$inc_dose) %>%
-        group_by(.data$kit, .data$kit_name, .data$dose_unit, .data$t) %>%
+        group_by(.data$kit, .data$kit_name, .data$t) %>%
         summarise(n = quantile(.data$total_dose, probs = 0.5),
                   pilevel = pilevel,
                   lower = quantile(.data$total_dose, probs = (1 - pilevel)/2),

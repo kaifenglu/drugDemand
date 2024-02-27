@@ -116,7 +116,6 @@
 #' @importFrom rlang .data
 #' @importFrom purrr map_dfr
 #' @importFrom eventPred getPrediction
-#' @importFrom tictoc tic toc
 #'
 NULL
 

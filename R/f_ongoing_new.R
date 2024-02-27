@@ -9,37 +9,36 @@
 #'   \code{draw}, \code{usubjid}, \code{arrivalTime}, \code{treatment},
 #'   \code{treatment_description}, \code{time}, \code{event},
 #'   \code{dropout}, and \code{totalTime}.
-#' @param drug_description_df The drug description data frame
-#'   including \code{drug}, \code{drug_name}, \code{dose_strength},
-#'   \code{kit}, \code{kit_name}, and \code{dose_unit}.
+#' @param kit_description_df A data frame indicating the
+#'   drug and kit descriptions, including the following variables:
+#'   \code{drug}, \code{drug_name}, \code{kit}, and \code{kit_name}.
 #'   It must be specified at the design stage. It will be replaced with
 #'   the observed information at the analysis stage.
-#' @param treatment_by_drug_df The data frame indicating the treatments
+#' @param treatment_by_drug_df A data frame indicating the treatments
 #'   associated with each drug, including the following variables:
 #'   \code{treatment} and \code{drug}.
 #' @param vf A data frame for subject-level drug dispensing data,
-#'   including the following variables: \code{drug}, \code{drug_name},
-#'   \code{dose_strength}, \code{kit}, \code{kit_name},
-#'   \code{dose_unit}, \code{usubjid}, \code{treatment},
-#'   \code{treatment_description}, \code{arrivalTime}, \code{time},
-#'   \code{event}, \code{dropout}, \code{day}, \code{dose},
-#'   \code{cum_dose}, and \code{row_id}.
+#'   including the following variables:
+#'   \code{drug}, \code{drug_name}, \code{kit}, \code{kit_name},
+#'   \code{usubjid}, \code{treatment}, \code{treatment_description},
+#'   \code{arrivalTime}, \code{time}, \code{event}, \code{dropout},
+#'   \code{day}, \code{dose}, \code{cum_dose}, and \code{row_id}.
 #'
 #' @return A list with the following components:
 #'
-#' * \code{vf_ongoing}: The observed drug dispensing data for ongoing
-#'   patients with drug dispensing records. It includes the following
-#'   variables: \code{draw}, \code{kit}, \code{kit_name}, \code{dose_unit},
-#'   \code{usubjid}, \code{day}, \code{dose}, \code{arrivalTime},
-#'   \code{treatment}, \code{treatment_description},
-#'   \code{time}, and \code{totalTime}.
-#'
-#' * \code{vf_new}: A data frame for the randomization date for new patients
-#'   and ongoing patients with no drug dispensing records.
+#' * \code{vf_ongoing}: A data frame for the observed drug dispensing
+#'   data for ongoing patients with drug dispensing records.
 #'   It includes the following variables:
-#'   \code{draw}, \code{kit}, \code{kit_name}, \code{dose_unit},
-#'   \code{usubjid}, \code{arrivalTime}, \code{treatment},
+#'   \code{draw}, \code{kit}, \code{kit_name}, \code{usubjid},
+#'   \code{day}, \code{dose}, \code{arrivalTime}, \code{treatment},
 #'   \code{treatment_description}, \code{time}, and \code{totalTime}.
+#'
+#' * \code{vf_new}: A data frame for the randomization date for new
+#'   patients and ongoing patients with no drug dispensing records.
+#'   It includes the following variables:
+#'   \code{draw}, \code{kit}, \code{kit_name}, \code{usubjid},
+#'   \code{arrivalTime}, \code{treatment}, \code{treatment_description},
+#'   \code{time}, and \code{totalTime}.
 #'
 #' @author Kaifeng Lu, \email{kaifenglu@@gmail.com}
 #'
@@ -63,10 +62,10 @@
 #' observed <- f_dose_observed(df = df2, visitview = visitview2)
 #'
 #' vf_ongoing_new <- f_ongoing_new(
-#'   newEvents = pred$event_pred$newEvents,
-#'   drug_description_df = observed$drug_description_df,
-#'   treatment_by_drug_df = observed$treatment_by_drug_df,
-#'   vf = observed$vf)
+#'   pred$event_pred$newEvents,
+#'   observed$kit_description_df,
+#'   observed$treatment_by_drug_df,
+#'   observed$vf)
 #'
 #' head(vf_ongoing_new$vf_ongoing)
 #' head(vf_ongoing_new$vf_new)
@@ -74,7 +73,7 @@
 #'
 #' @export
 f_ongoing_new <- function(
-    newEvents, drug_description_df, treatment_by_drug_df, vf) {
+    newEvents, kit_description_df, treatment_by_drug_df, vf) {
   nreps = length(unique(newEvents$draw))
 
   if (!is.null(vf)) {
@@ -82,8 +81,7 @@ f_ongoing_new <- function(
     vf1 <- vf %>%
       filter(.data$event == 0) %>%
       ungroup() %>%
-      select(c("kit", "kit_name", "dose_unit",
-               "usubjid", "day", "dose"))
+      select(c("kit", "kit_name", "usubjid", "day", "dose"))
 
     # ongoing subjects with dosing records
     unames <- unique(vf1$usubjid)
@@ -101,7 +99,7 @@ f_ongoing_new <- function(
     ### new patients and ongoing patients with no dosing records ###
     df_new <- newEvents %>% filter(!(.data$usubjid %in% unames))
 
-    J = length(unique(drug_description_df$drug))
+    J = length(unique(kit_description_df$drug))
     if (nrow(df_new) > 0) {
       vf_new1 <- purrr::map_dfr(
         1:J, function(j) {
@@ -113,8 +111,7 @@ f_ongoing_new <- function(
       # draw kit probabilities from Dirichlet distribution
       vf2 <- vf %>%
         slice(1) %>%
-        group_by(.data$drug, .data$drug_name, .data$dose_strength,
-                 .data$kit, .data$kit_name, .data$dose_unit) %>%
+        group_by(.data$drug, .data$drug_name, .data$kit, .data$kit_name) %>%
         summarise(n = n(), .groups = "drop_last")
 
       p_kit <- purrr::map(1:J, function(j) {
@@ -122,7 +119,7 @@ f_ongoing_new <- function(
       })
 
       # number of kits per drug
-      nkits <- as.numeric(table(drug_description_df$drug))
+      nkits <- as.numeric(table(kit_description_df$drug))
       offset <- c(0, cumsum(nkits))[1:J]
 
       # loop over drugs
@@ -130,16 +127,16 @@ f_ongoing_new <- function(
         if (nkits[j] == 1) {
           vf_new1 %>% filter(.data$drug == j) %>%
             mutate(kit = offset[j] + 1) %>%
-            inner_join(drug_description_df, by = c("drug", "kit"))
+            inner_join(kit_description_df, by = c("drug", "kit"))
         } else {
           purrr::map_dfr(1:nreps, function(i) {
             df_new1 <- vf_new1 %>% filter(.data$draw == i & .data$drug == j)
             kit_ind <- t(rmultinom(nrow(df_new1), 1, p_kit[[j]][i,]))
             df_new1$kit <- as.numeric(kit_ind %*% seq(1,nkits[j])) + offset[j]
-            df_new1 %>% inner_join(drug_description_df, by = c("drug", "kit"))
+            df_new1 %>% inner_join(kit_description_df, by = c("drug", "kit"))
           })
         }
-      }) %>% select(-c("drug", "drug_name", "dose_strength"))
+      }) %>% select(-c("drug", "drug_name"))
     } else {
       vf_new <- NULL
     }
@@ -147,7 +144,7 @@ f_ongoing_new <- function(
     vf_ongoing <- NULL
 
     # drug and kit information for new subjects
-    J = length(unique(drug_description_df$drug))
+    J = length(unique(kit_description_df$drug))
     vf_new1 <- purrr::map_dfr(
       1:J, function(j) {
         newEvents %>%
@@ -157,11 +154,11 @@ f_ongoing_new <- function(
 
     # add kit information for new subjects
     p_kit <- purrr::map(1:J, function(j) {
-      drug_description_df$p_kit[drug_description_df$drug == j]
+      kit_description_df$p_kit[kit_description_df$drug == j]
     })
 
     # number of kits per drug
-    nkits <- as.numeric(table(drug_description_df$drug))
+    nkits <- as.numeric(table(kit_description_df$drug))
     offset <- c(0, cumsum(nkits))[1:J]
 
     # loop over drugs
@@ -169,16 +166,16 @@ f_ongoing_new <- function(
       if (nkits[j] == 1) {
         vf_new1 %>% filter(.data$drug == j) %>%
           mutate(kit = offset[j] + 1) %>%
-          inner_join(drug_description_df, by = c("drug", "kit"))
+          inner_join(kit_description_df, by = c("drug", "kit"))
       } else {
         purrr::map_dfr(1:nreps, function(i) {
           df_new1 <- vf_new1 %>% filter(.data$draw == i & .data$drug == j)
-          kit_ind <- t(rmultinom(nrow(df_new1), 1, p_kit[[j]][i,]))
+          kit_ind <- t(rmultinom(nrow(df_new1), 1, p_kit[[j]]))
           df_new1$kit <- as.numeric(kit_ind %*% seq(1,nkits[j])) + offset[j]
-          df_new1 %>% inner_join(drug_description_df, by = c("drug", "kit"))
+          df_new1 %>% inner_join(kit_description_df, by = c("drug", "kit"))
         })
       }
-    }) %>% select(-c("drug", "drug_name", "dose_strength"))
+    }) %>% select(-c("drug", "drug_name"))
   }
 
   list(vf_ongoing = vf_ongoing, vf_new = vf_new)

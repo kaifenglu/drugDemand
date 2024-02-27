@@ -806,14 +806,14 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
 #'
 #' @param vf A data frame for subject-level drug dispensing data,
 #'   including the following variables:
-#'   \code{drug}, \code{drug_name}, \code{dose_strength},
-#'   \code{kit}, \code{kit_name}, \code{dose_unit},
+#'   \code{drug}, \code{drug_name}, \code{kit}, \code{kit_name},
 #'   \code{usubjid}, \code{treatment}, \code{treatment_description},
 #'   \code{arrivalTime}, \code{time}, \code{event}, \code{dropout},
 #'   \code{day}, \code{dose}, \code{cum_dose}, and \code{row_id}.
 #' @param dosing_schedule_df A data frame providing dosing schedule
-#'   information. It contains the following variables: \code{kit},
-#'   \code{target_days}, \code{target_dose}, and \code{max_cycles}.
+#'   information. It contains the following variables:
+#'   \code{kit}, \code{target_days}, \code{target_dose}, and
+#'   \code{max_cycles}.
 #' @param model_k0 The model for the number of skipped
 #'   visits between randomization and the first drug dispensing visit.
 #'   Options include "constant", "poisson", "zero-inflated poisson",
@@ -874,10 +874,9 @@ f_fit_di <- function(df, model, nreps, showplot = TRUE) {
 #' library(dplyr)
 #'
 #' observed <- f_dose_observed(df2, visitview2, showplot = FALSE)
-#' vf <- observed$vf
 #'
 #' dispensing_models <- f_dispensing_models(
-#'   vf, dosing_schedule_df,
+#'   observed$vf, dosing_schedule_df,
 #'   model_k0 = "zero-inflated poisson",
 #'   model_t0 = "log-logistic",
 #'   model_t1 = "least squares",

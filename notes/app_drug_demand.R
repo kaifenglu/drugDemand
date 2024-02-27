@@ -201,7 +201,6 @@ f_cum_dose <- function(x, w, d, N) {
 }
 
 
-
 observed_enrollment_event_data_panel <- tabPanel(
   title = "Enrollment and Event",
   value = "enrollment_event_data_panel",
@@ -233,7 +232,7 @@ observed_dosing_data_panel <- tabPanel(
   title = "Drug Dispensing",
   value = "dosing_data_panel",
 
-  htmlOutput("dummy"),
+  htmlOutput("dates_copy"),
   verbatimTextOutput("cum_dose_t0"),
 
   plotlyOutput("cum_dispense_plot"),
@@ -241,9 +240,10 @@ observed_dosing_data_panel <- tabPanel(
   plotlyOutput("bar_ti_plot"),
   plotlyOutput("bar_di_plot"),
 
-  dataTableOutput("input_visitview")
+  conditionalPanel(
+    condition = "input.stage != 'Design stage'",
+    dataTableOutput("input_visitview"))
 )
-
 
 
 observedPanel <- tabPanel(
@@ -257,7 +257,6 @@ observedPanel <- tabPanel(
     observed_dosing_data_panel
   )
 )
-
 
 
 enrollmentPanel <- tabPanel(
@@ -467,7 +466,7 @@ eventPanel <- tabPanel(
                numericInput(
                  "spline_k",
                  label = "How many inner knots to use?",
-                 value = 0,
+                 value = 1,
                  min = 0, max = 10, step = 1),
 
                radioButtons(
@@ -480,6 +479,7 @@ eventPanel <- tabPanel(
       )
     ),
 
+    uiOutput("event_fit_ic"),
     uiOutput("event_fit")
   )
 )
@@ -502,7 +502,6 @@ dosingSchedulePanel <- tabPanel(
 )
 
 
-
 k0Panel <- tabPanel(
   title = "k0 model",
   value = "k0_model_panel",
@@ -515,12 +514,11 @@ k0Panel <- tabPanel(
     choices = c("Poisson",
                 "Zero-inflated Poisson",
                 "Negative binomial"),
-    selected = "Zero-inflated Poisson",
+    selected = "Negative binomial",
     inline = FALSE),
 
   uiOutput("k0_fit")
 )
-
 
 
 t0Panel <- tabPanel(
@@ -573,12 +571,11 @@ kiPanel <- tabPanel(
     choices = c("Poisson",
                 "Zero-inflated Poisson",
                 "Negative binomial"),
-    selected = "Zero-inflated Poisson",
+    selected = "Negative binomial",
     inline = FALSE),
 
   uiOutput("ki_fit")
 )
-
 
 
 tiPanel <- tabPanel(
@@ -591,7 +588,7 @@ tiPanel <- tabPanel(
                   "consecutive drug dispensing visits?"),
     choices = c("Least squares",
                 "Least absolute deviations"),
-    selected = "Least squares",
+    selected = "Least absolute deviations",
     inline = FALSE),
 
   uiOutput("ti_fit")
@@ -611,6 +608,7 @@ diPanel <- tabPanel(
     selected = "Linear mixed-effects model",
     inline = FALSE),
 
+  uiOutput("di_fit_ic"),
   uiOutput("di_fit")
 )
 
@@ -623,7 +621,6 @@ dosingPanel <- tabPanel(
     id = "dosing_tabset",
 
     dosingSchedulePanel,
-
     k0Panel,
     t0Panel,
     t1Panel,
@@ -632,7 +629,6 @@ dosingPanel <- tabPanel(
     diPanel
   )
 )
-
 
 
 eventPredictPanel <- tabPanel(
@@ -653,7 +649,13 @@ dosingPredictPanel <- tabPanel(
 
   uiOutput("dosing_plot"),
   downloadButton("downloadDosingSummaryData", "Download summary data"),
-  downloadButton("downloadDosingSubjectData", "Download subject data")
+  downloadButton("downloadDosingSubjectData",
+                 label = tags$span(
+                   "Download subject data",
+                   tags$span(icon(name = "question-circle")) %>%
+                     add_prompt(message = "for the first simulation only",
+                                position = "right"))
+                 )
 )
 
 
@@ -740,7 +742,13 @@ ui <- fluidPage(
 
         radioButtons(
           "to_predict",
-          label = "What to predict?",
+          label = tags$span(
+            "What to predict?",
+            tags$span(icon(name = "question-circle")) %>%
+              add_prompt(message =
+                           "Event refers to treatment discontinuation",
+                         position = "right")),
+
           choices = c("Enrollment only",
                       "Enrollment and event"),
           selected = "Enrollment and event",
@@ -870,12 +878,20 @@ ui <- fluidPage(
           accept = ".xlsx"
         ),
 
-        checkboxGroupInput(
-          "to_show_dosing",
-          label = "What to show on dosing prediction plot?",
-          choices = c("Model based", "Protocol based"),
-          selected = c("Model based"),
-          inline = TRUE
+        checkboxInput(
+          "pred_pp_only",
+          label = "Protocol based prediction only?",
+          value = FALSE),
+
+        conditionalPanel(
+          condition = "!input.pred_pp_only",
+          checkboxGroupInput(
+            "to_show_dosing",
+            label = "What to show on dosing prediction plot?",
+            choices = c("Model based", "Protocol based"),
+            selected = c("Model based"),
+            inline = TRUE
+          )
         )
       ),
 
@@ -924,9 +940,117 @@ ui <- fluidPage(
 
 # server function -------------
 server <- function(input, output, session) {
-  # session$onSessionEnded(function() {
-  #   stopApp()
-  # })
+  # what to predict at different stages
+  to_predict <- reactive({
+    if (input$stage != 'Real-time after enrollment completion') {
+      input$to_predict
+    } else {
+      input$to_predict2
+    }
+  })
+
+
+  # input data set
+  df <- reactive({
+    # input$file1 will be NULL initially. After the user selects
+    # and uploads a file, it will be a data frame with 'name',
+    # 'size', 'type', and 'datapath' columns. The 'datapath'
+    # column will contain the local filenames where the data can
+    # be found.
+    inFile <- input$file1
+
+    if (is.null(inFile))
+      return(NULL)
+
+    df <- readxl::read_excel(inFile$datapath)
+
+    if (to_predict() == "Enrollment only") {
+      req_cols <- c('trialsdt', 'usubjid', 'randdt', 'cutoffdt')
+    } else {
+      req_cols <- c('trialsdt', 'usubjid', 'randdt', 'cutoffdt',
+                    'time', 'event', 'dropout')
+    }
+
+    if (input$by_treatment) {
+      req_cols <- c(req_cols, 'treatment')
+    }
+
+    cols <- colnames(df)
+
+    shiny::validate(
+      need(all(req_cols %in% cols),
+           paste("The following columns are missing from the input data:",
+                 paste(req_cols[!(req_cols %in% cols)], collapse = ", "))))
+
+    if (any(is.na(df[, req_cols]))) {
+      stop(paste("The following columns have missing values:",
+                 paste(req_cols[sapply(df, function(x) any(is.na(x)))],
+                       collapse = ", ")))
+    }
+
+    if ('treatment' %in% cols && !('treatment_description' %in% cols)) {
+      df <- df %>%
+        mutate(treatment_description = paste0("Treatment ", treatment))
+    }
+
+    tibble(df) %>%
+      mutate(trialsdt = as.Date(trialsdt),
+             randdt = as.Date(randdt),
+             cutoffdt = as.Date(cutoffdt))
+  })
+
+
+  # summarize observed data
+  observed <- reactive({
+    if (!is.null(df()))
+      summarizeObserved(df(), to_predict(), showplot = FALSE,
+                        input$by_treatment)
+  })
+
+
+  # input data set
+  visitview <- reactive({
+    # input$file2 will be NULL initially. After the user selects
+    # and uploads a file, it will be a data frame with 'name',
+    # 'size', 'type', and 'datapath' columns. The 'datapath'
+    # column will contain the local filenames where the data can
+    # be found.
+    inFile <- input$file2
+
+    if (is.null(inFile))
+      return(NULL)
+
+    df <- readxl::read_excel(inFile$datapath)
+
+    req_cols <- c('usubjid', 'date', 'drug', 'drug_name', 'dose_unit',
+                  'dispensed_quantity')
+
+    cols <- colnames(df)
+
+    shiny::validate(
+      need(all(req_cols %in% cols),
+           paste("The following columns are missing from the input data:",
+                 paste(req_cols[!(req_cols %in% cols)], collapse = ", "))))
+
+    if (any(is.na(df[, req_cols]))) {
+      stop(paste("The following columns have missing values:",
+                 paste(req_cols[sapply(df, function(x) any(is.na(x)))],
+                       collapse = ", ")))
+    }
+
+    tibble(df) %>%
+      mutate(date = as.Date(date))
+  })
+
+
+  dose_observed <- reactive({
+    if (!is.null(df()) & !is.null(visitview())) {
+      f_dose_observed(df(), visitview(), showplot = FALSE)
+    } else {
+      NULL
+    }
+  })
+
 
   # whether to show or hide the observed data panel
   observeEvent(input$stage, {
@@ -941,16 +1065,6 @@ server <- function(input, output, session) {
   # whether to allow the user to specify the number of treatments
   observeEvent(input$stage, {
     shinyjs::toggleState("k", input$stage == "Design stage")
-  })
-
-
-  # what to predict at different stages
-  to_predict <- reactive({
-    if (input$stage != 'Real-time after enrollment completion') {
-      input$to_predict
-    } else {
-      input$to_predict2
-    }
   })
 
 
@@ -981,9 +1095,19 @@ server <- function(input, output, session) {
   })
 
 
+  # whether to make protocol based predictions only
+  pred_pp_only <- reactive({
+    if (predict_dosing()) {
+      input$pred_pp_only
+    } else {
+      TRUE
+    }
+  })
+
+
   observeEvent(list(input$stage, to_predict(), predict_dosing()), {
-    if (input$stage != 'Design stage' &
-        to_predict() != 'Enrollment only' &
+    if (input$stage != 'Design stage' &&
+        to_predict() != 'Enrollment only' &&
         predict_dosing()) {
       showTab(inputId = "observed_data_tabset", target = "dosing_data_panel")
     } else {
@@ -1001,7 +1125,6 @@ server <- function(input, output, session) {
       hideTab(inputId = "results", target = "dosing_prediction_panel")
     }
   })
-
 
 
   target_n <- reactive({
@@ -1077,7 +1200,6 @@ server <- function(input, output, session) {
   showProtocolBased <- reactive({
     "Protocol based" %in% input$to_show_dosing
   })
-
 
 
   nreps <- reactive({
@@ -1415,8 +1537,6 @@ server <- function(input, output, session) {
   })
 
 
-
-
   l <- reactive({
     if (input$stage != "Design stage" && !is.null(visitview())) {
       l = length(table(visitview()$drug))
@@ -1448,32 +1568,12 @@ server <- function(input, output, session) {
 
 
   drug_name <- reactive({
-    req(l())
-    if (input$stage != "Design stage" && !is.null(visitview())) {
-      a <- visitview() %>%
-        group_by(drug, drug_name, dose_unit) %>%
-        slice(n()) %>%
-        select(drug, drug_name, dose_unit)
-      a$drug_name
-    } else {
-      param = input[[paste0("drug_description_", l())]]
-      as.character(param[,1])
-    }
+    drug_description_df()$drug_name
   })
 
 
   dose_unit <- reactive({
-    req(l())
-    if (input$stage != "Design stage" && !is.null(visitview())) {
-      a <- visitview() %>%
-        group_by(drug, drug_name, dose_unit) %>%
-        slice(n()) %>%
-        select(drug, drug_name, dose_unit)
-      a$dose_unit
-    } else {
-      param = input[[paste0("drug_description_", l())]]
-      as.character(param[,2])
-    }
+    drug_description_df()$dose_unit
   })
 
 
@@ -1485,20 +1585,7 @@ server <- function(input, output, session) {
       df <- df() %>%
         mutate(arrivalTime = as.numeric(randdt - trialsdt + 1))
 
-      vf <- visitview() %>%
-        inner_join(df, by = "usubjid") %>%
-        mutate(day = as.numeric(date - randdt + 1)) %>%
-        select(drug, drug_name, dose_unit, usubjid, treatment,
-               treatment_description, arrivalTime,
-               time, event, dropout, day, dispensed_quantity) %>%
-        group_by(drug, drug_name, dose_unit, usubjid, treatment,
-                 treatment_description, arrivalTime,
-                 time, event, dropout, day) %>%
-        summarise(dose = sum(dispensed_quantity),
-                  .groups = "drop_last") %>%
-        mutate(cum_dose = cumsum(dose)) %>%
-        group_by(drug, drug_name, dose_unit, usubjid) %>%
-        mutate(row_id = row_number())
+      vf <- dose_observed()$vf
 
       treatment_by_drug_df <- vf %>%
         group_by(treatment, drug, drug_name, dose_unit) %>%
@@ -1539,53 +1626,16 @@ server <- function(input, output, session) {
 
 
   treatment_by_drug_df <- reactive({
-    if (input$stage != 'Design stage' && !is.null(df()) &&
-        !is.null(visitview())) {
-      df <- df() %>%
-        mutate(arrivalTime = as.numeric(
-          randdt - trialsdt + 1))
+    t = as.numeric(treatment_by_drug())
 
-      vf <- visitview() %>%
-        inner_join(df, by = "usubjid") %>%
-        mutate(day = as.numeric(date - randdt + 1)) %>%
-        select(drug, drug_name, dose_unit, usubjid, treatment,
-               treatment_description, arrivalTime,
-               time, event, dropout, day, dispensed_quantity) %>%
-        group_by(drug, drug_name, dose_unit, usubjid, treatment,
-                 treatment_description, arrivalTime,
-                 time, event, dropout, day) %>%
-        summarise(dose = sum(dispensed_quantity),
-                  .groups = "drop_last") %>%
-        mutate(cum_dose = cumsum(dose)) %>%
-        group_by(drug, drug_name, dose_unit, usubjid) %>%
-        mutate(row_id = row_number())
-
-      treatment_by_drug_df <- vf %>%
-        group_by(treatment, drug, drug_name, dose_unit) %>%
-        slice(n()) %>%
-        select(treatment, drug, drug_name, dose_unit)
-    } else {
-      param = input[[paste0("treatment_by_drug_", k(), "_", l())]]
-      t = as.numeric(param)
-
-      valid = all(t==1 | t==0)
-      if (!valid) {
-        showNotification(
-          "Entries of treatment by drug matrix must be 1 or 0"
-        )
-      }
-
-      req(valid)
-
-      treatment_by_drug_df <- tibble(
-        treatment = rep(1:k(), l()),
-        drug = rep(1:l(), each=k()),
-        drug_name = rep(drug_name(), each=k()),
-        dose_unit = rep(dose_unit(), each=k()),
-        included = as.logical(t)) %>%
-        filter(included) %>%
-        select(treatment, drug, drug_name, dose_unit)
-    }
+    treatment_by_drug_df <- tibble(
+      treatment = rep(1:k(), l()),
+      drug = rep(1:l(), each=k()),
+      drug_name = rep(drug_name(), each=k()),
+      dose_unit = rep(dose_unit(), each=k()),
+      included = as.logical(t)) %>%
+      filter(included) %>%
+      select(treatment, drug, drug_name, dose_unit)
 
     treatment_by_drug_df
   })
@@ -1653,93 +1703,6 @@ server <- function(input, output, session) {
                                    c("Days per Cycle",
                                      "Dose per Cycle",
                                      "Number of Cycles"))))
-  })
-
-
-
-  # input data set
-  df <- reactive({
-    # input$file1 will be NULL initially. After the user selects
-    # and uploads a file, it will be a data frame with 'name',
-    # 'size', 'type', and 'datapath' columns. The 'datapath'
-    # column will contain the local filenames where the data can
-    # be found.
-    inFile <- input$file1
-
-    if (is.null(inFile))
-      return(NULL)
-
-    df <- readxl::read_excel(inFile$datapath)
-
-    if (to_predict() == "Enrollment only") {
-      required_columns <- c('trialsdt', 'randdt', 'cutoffdt')
-    } else {
-      required_columns <- c('trialsdt', 'randdt', 'cutoffdt', 'time', 'event',
-                            'dropout')
-    }
-
-    if (input$by_treatment) {
-      required_columns <- c(required_columns, 'treatment')
-    }
-
-
-    column_names <- colnames(df)
-
-    shiny::validate(
-      need(all(required_columns %in% column_names),
-           "You don't have the right data"))
-
-    if ('treatment' %in% column_names &&
-        !('treatment_description' %in% column_names)) {
-      df <- df %>% mutate(
-        treatment_description = paste0("Treatment ", treatment))
-    }
-
-    tibble(df) %>%
-      mutate(trialsdt = as.Date(trialsdt),
-             randdt = as.Date(randdt),
-             cutoffdt = as.Date(cutoffdt))
-
-  })
-
-
-  # input data set
-  visitview <- reactive({
-    # input$file2 will be NULL initially. After the user selects
-    # and uploads a file, it will be a data frame with 'name',
-    # 'size', 'type', and 'datapath' columns. The 'datapath'
-    # column will contain the local filenames where the data can
-    # be found.
-    inFile <- input$file2
-
-    if (is.null(inFile))
-      return(NULL)
-
-    df <- readxl::read_excel(inFile$datapath)
-
-    required_columns <- c('usubjid', 'visit', 'date', 'drug', 'drug_name',
-                          'dose_unit', 'kit_number', 'dispensed_quantity')
-
-    column_names <- colnames(df)
-
-    shiny::validate(
-      need(all(required_columns %in% column_names),
-           "You don't have the right data"))
-
-    tibble(df) %>%
-      mutate(date = as.Date(date))
-
-  })
-
-
-
-
-
-  # summarize observed data
-  observed <- reactive({
-    if (!is.null(df()))
-      summarizeObserved(df(), to_predict(), showplot = FALSE,
-                        input$by_treatment)
   })
 
 
@@ -1869,7 +1832,7 @@ server <- function(input, output, session) {
     } else { # real-time prediction
       shiny::validate(
         need(!is.null(df()),
-             paste("Please upload enrollment and/or event data for",
+             paste("Please upload enrollment and event data for",
                    "real-time prediction.")))
 
       if (to_predict() == "Enrollment only") {
@@ -1953,40 +1916,15 @@ server <- function(input, output, session) {
   })
 
 
-
-  dose_observed <- reactive({
-    if (!is.null(df()) & !is.null(visitview())) {
-      f_dose_observed(df(), visitview(), showplot = FALSE)
-    } else {
-      NULL
-    }
-  })
-
-
   model_k0 <- reactive({
     if (input$stage != 'Design stage' && !is.null(df()) &&
         !is.null(visitview()) && !is.null(dosing_schedule_df())) {
 
-      df <- df() %>%
-        mutate(arrivalTime = as.numeric(randdt - trialsdt + 1))
-
-      vf <- visitview() %>%
-        inner_join(df, by = "usubjid") %>%
-        mutate(day = as.numeric(date - randdt + 1)) %>%
-        select(drug, drug_name, dose_unit, usubjid, treatment,
-               treatment_description, arrivalTime,
-               time, event, dropout, day, dispensed_quantity) %>%
-        group_by(drug, drug_name, dose_unit, usubjid, treatment,
-                 treatment_description, arrivalTime,
-                 time, event, dropout, day) %>%
-        summarise(dose = sum(dispensed_quantity), .groups = "drop_last") %>%
-        mutate(cum_dose = cumsum(dose)) %>%
-        group_by(drug, drug_name, dose_unit, usubjid) %>%
-        mutate(row_id = row_number())
+      vf <- dose_observed()$vf %>%
+        left_join(dosing_schedule_df(), by = "drug")
 
       df_k0 <- vf %>%
         filter(row_id == 1) %>%
-        left_join(dosing_schedule_df(), by = "drug") %>%
         mutate(skipped = floor((day - target_days/2)/target_days) + 1)
 
       a = sum(df_k0$skipped)
@@ -1999,8 +1937,15 @@ server <- function(input, output, session) {
 
 
   # whether to show or hide k0, t0, t1, k0, ti, and di panels
-  observeEvent(list(input$stage, model_k0()), {
-    if (input$stage != 'Design stage') {
+  observeEvent(list(input$stage, model_k0(), pred_pp_only()), {
+    if (input$stage == 'Design stage' || pred_pp_only()) {
+      hideTab(inputId = "dosing_tabset", target = "k0_model_panel")
+      hideTab(inputId = "dosing_tabset", target = "t0_model_panel")
+      hideTab(inputId = "dosing_tabset", target = "t1_model_panel")
+      hideTab(inputId = "dosing_tabset", target = "ki_model_panel")
+      hideTab(inputId = "dosing_tabset", target = "ti_model_panel")
+      hideTab(inputId = "dosing_tabset", target = "di_model_panel")
+    } else {
       if (model_k0() != "Constant") {
         showTab(inputId = "dosing_tabset", target = "k0_model_panel")
         showTab(inputId = "dosing_tabset", target = "t1_model_panel")
@@ -2012,13 +1957,6 @@ server <- function(input, output, session) {
       showTab(inputId = "dosing_tabset", target = "ki_model_panel")
       showTab(inputId = "dosing_tabset", target = "ti_model_panel")
       showTab(inputId = "dosing_tabset", target = "di_model_panel")
-    } else {
-      hideTab(inputId = "dosing_tabset", target = "k0_model_panel")
-      hideTab(inputId = "dosing_tabset", target = "t0_model_panel")
-      hideTab(inputId = "dosing_tabset", target = "t1_model_panel")
-      hideTab(inputId = "dosing_tabset", target = "ki_model_panel")
-      hideTab(inputId = "dosing_tabset", target = "ti_model_panel")
-      hideTab(inputId = "dosing_tabset", target = "di_model_panel")
     }
   })
 
@@ -2048,7 +1986,6 @@ server <- function(input, output, session) {
   })
 
 
-
   common_time_model <- reactive({
     if (!is.null(dosing_schedule_df())) {
       ifelse(length(unique(dosing_schedule_df()$target_days)) == 1,
@@ -2057,23 +1994,15 @@ server <- function(input, output, session) {
   })
 
 
-
   fit_k0 <- reactive({
     if (!is.null(dose_observed()) & !is.null(dosing_schedule_df())) {
       vf = dose_observed()$vf %>%
         left_join(dosing_schedule_df(), by = "drug")
 
       if (common_time_model()) {
-        # only keep one record per subject and drug dispensing day
-        # need to redefine row_id due to drug dispensing at unscheduled visits
-        vf1 <- vf %>%
-          group_by(usubjid, day) %>%
-          slice(n()) %>%
-          group_by(usubjid) %>%
-          mutate(row_id = row_number())
-
         # time from randomization to the first drug dispensing visit
-        df_k0 <- vf1 %>%
+        # use data from all drugs to inform the model
+        df_k0 <- vf %>%
           filter(row_id == 1) %>%
           mutate(time = day,
                  skipped = floor((time - target_days/2)/target_days) + 1)
@@ -2105,16 +2034,9 @@ server <- function(input, output, session) {
         left_join(dosing_schedule_df(), by = "drug")
 
       if (common_time_model()) {
-        # only keep one record per subject and drug dispensing day
-        # need to redefine row_id due to drug dispensing at unscheduled visits
-        vf1 <- vf %>%
-          group_by(usubjid, day) %>%
-          slice(n()) %>%
-          group_by(usubjid) %>%
-          mutate(row_id = row_number())
-
         # time from randomization to the first drug dispensing visit
-        df_k0 <- vf1 %>%
+        # use data from all drugs to inform the model
+        df_k0 <- vf %>%
           filter(row_id == 1) %>%
           mutate(time = day,
                  skipped = floor((time - target_days/2)/target_days) + 1)
@@ -2156,16 +2078,9 @@ server <- function(input, output, session) {
         left_join(dosing_schedule_df(), by = "drug")
 
       if (common_time_model()) {
-        # only keep one record per subject and drug dispensing day
-        # need to redefine row_id due to drug dispensing at unscheduled visits
-        vf1 <- vf %>%
-          group_by(usubjid, day) %>%
-          slice(n()) %>%
-          group_by(usubjid) %>%
-          mutate(row_id = row_number())
-
         # time from randomization to the first drug dispensing visit
-        df_k0 <- vf1 %>%
+        # use data from all drugs to inform the model
+        df_k0 <- vf %>%
           filter(row_id == 1) %>%
           mutate(time = day,
                  skipped = floor((time - target_days/2)/target_days) + 1)
@@ -2175,7 +2090,11 @@ server <- function(input, output, session) {
           filter(skipped > 0) %>%
           mutate(k1 = skipped)
 
-        fit_t1 <- f_fit_ti(df_t1, model_t1(), nreps(), showplot = FALSE)
+        if (nrow(df_t1) == 0) {
+          fit_t1 = NULL
+        } else {
+          fit_t1 <- f_fit_ti(df_t1, model_t1(), nreps(), showplot = FALSE)
+        }
       } else {
         fit_t1 <- purrr::map(1:l(), function(h) {
           # observed dosing data for the drug under consideration
@@ -2192,7 +2111,11 @@ server <- function(input, output, session) {
             filter(skipped > 0) %>%
             mutate(k1 = skipped)
 
-          f_fit_ti(df_t1, model_t1(), nreps(), showplot = FALSE)
+          if (nrow(df_t1) == 0) {
+            NULL
+          } else {
+            f_fit_ti(df_t1, model_t1(), nreps(), showplot = FALSE)
+          }
         })
       }
 
@@ -2207,16 +2130,8 @@ server <- function(input, output, session) {
         left_join(dosing_schedule_df(), by = "drug")
 
       if (common_time_model()) {
-        # only keep one record per subject and drug dispensing day
-        # need to redefine row_id due to drug dispensing at unscheduled visits
-        vf1 <- vf %>%
-          group_by(usubjid, day) %>%
-          slice(n()) %>%
-          group_by(usubjid) %>%
-          mutate(row_id = row_number())
-
         # gap time and number of skipped visits between drug dispensing visits
-        df_ti <- vf1 %>%
+        df_ti <- vf %>%
           mutate(time = lead(day) - day,
                  skipped = pmax(floor((time - target_days/2)/target_days), 0),
                  k1 = skipped + 1) %>%
@@ -2228,10 +2143,11 @@ server <- function(input, output, session) {
           # observed dosing data for the drug under consideration
           vf1 <- vf %>% filter(drug == h)
 
-          # gap time and number of skipped visits between drug dispensing visits
+          # gap time & number of skipped visits between drug dispensing visits
           df_ti <- vf1 %>%
             mutate(time = lead(day) - day,
-                   skipped = pmax(floor((time - target_days/2)/target_days), 0),
+                   skipped = pmax(floor((time - target_days/2)/target_days),
+                                  0),
                    k1 = skipped + 1) %>%
             filter(row_id < n())
 
@@ -2250,16 +2166,8 @@ server <- function(input, output, session) {
         left_join(dosing_schedule_df(), by = "drug")
 
       if (common_time_model()) {
-        # only keep one record per subject and drug dispensing day
-        # need to redefine row_id due to drug dispensing at unscheduled visits
-        vf1 <- vf %>%
-          group_by(usubjid, day) %>%
-          slice(n()) %>%
-          group_by(usubjid) %>%
-          mutate(row_id = row_number())
-
         # gap time and number of skipped visits between drug dispensing visits
-        df_ti <- vf1 %>%
+        df_ti <- vf %>%
           mutate(time = lead(day) - day,
                  skipped = pmax(floor((time - target_days/2)/target_days), 0),
                  k1 = skipped + 1) %>%
@@ -2271,10 +2179,11 @@ server <- function(input, output, session) {
           # observed dosing data for the drug under consideration
           vf1 <- vf %>% filter(drug == h)
 
-          # gap time and number of skipped visits between drug dispensing visits
+          # gap time & number of skipped visits between drug dispensing visits
           df_ti <- vf1 %>%
             mutate(time = lead(day) - day,
-                   skipped = pmax(floor((time - target_days/2)/target_days), 0),
+                   skipped = pmax(floor((time - target_days/2)/target_days),
+                                  0),
                    k1 = skipped + 1) %>%
             filter(row_id < n())
 
@@ -2285,7 +2194,6 @@ server <- function(input, output, session) {
       fit_ti
     }
   })
-
 
 
   fit_di <- reactive({
@@ -2302,7 +2210,6 @@ server <- function(input, output, session) {
       fit_di
     }
   })
-
 
 
   dosing <- eventReactive(input$predict, {
@@ -2347,22 +2254,36 @@ server <- function(input, output, session) {
           dosing_schedule_df = dosing_schedule_df(),
           pilevel = pilevel(),
           nyears = nyears(),
+          pred_pp_only = pred_pp_only(),
           showplot = FALSE)
       } else {
-        drug_demand <- f_drug_demand(
-          df = df(),
-          newEvents = newEvents,
-          visitview = visitview(),
-          dosing_schedule_df = dosing_schedule_df(),
-          model_k0 = model_k0(),
-          model_t0 = model_t0(),
-          model_t1 = model_t1(),
-          model_ki = model_ki(),
-          model_ti = model_ti(),
-          model_di = model_di(),
-          pilevel = pilevel(),
-          nyears = nyears(),
-          showplot = FALSE)
+        if (pred_pp_only()) {
+          drug_demand <- f_drug_demand(
+            df = df(),
+            newEvents = newEvents,
+            visitview = visitview(),
+            dosing_schedule_df = dosing_schedule_df(),
+            pilevel = pilevel(),
+            nyears = nyears(),
+            pred_pp_only = pred_pp_only(),
+            showplot = FALSE)
+        } else {
+          drug_demand <- f_drug_demand(
+            df = df(),
+            newEvents = newEvents,
+            visitview = visitview(),
+            dosing_schedule_df = dosing_schedule_df(),
+            model_k0 = model_k0(),
+            model_t0 = model_t0(),
+            model_t1 = model_t1(),
+            model_ki = model_ki(),
+            model_ti = model_ti(),
+            model_di = model_di(),
+            pilevel = pilevel(),
+            nyears = nyears(),
+            pred_pp_only = pred_pp_only(),
+            showplot = FALSE)
+        }
       }
 
       drug_demand
@@ -2479,7 +2400,7 @@ server <- function(input, output, session) {
   )
 
 
-  output$dummy <- renderText({
+  output$dates_copy <- renderText({
     if (!is.null(observed())) {
       str1 <- paste("Trial start date:", observed()$trialsdt)
       str2 <- paste("Data cutoff date:", observed()$cutoffdt)
@@ -2538,17 +2459,49 @@ server <- function(input, output, session) {
   })
 
 
-  output$event_fit1 <- renderPlotly({
-    if (!is.null(event_fit())) event_fit()$event_fit_plot
+  # event fit information criteria
+  output$event_fit_ic <- renderText({
+    if (input$by_treatment && k() > 1) {
+      aic = sum(sapply(event_fit()$event_fit, function(fit) fit$aic))
+      bic = sum(sapply(event_fit()$event_fit, function(fit) fit$bic))
+      aictext = paste("Total AIC:", formatC(aic, format = "f", digits = 2))
+      bictext = paste("Total BIC:", formatC(bic, format = "f", digits = 2))
+      text1 = paste0("<i>", aictext, ", ", bictext, "</i>")
+    } else {
+      text1 = NULL
+    }
+
+    if (!is.null(text1)) text1
   })
 
 
+  observe({
+    walk(1:10, function(i) {
+      output[[paste0("event_fit_output", i)]] <- renderPlotly({
+        if (i <= k()) {
+          if (input$by_treatment && k() > 1) {
+            event_fit()$event_fit_plot[[i]]
+          } else {
+            event_fit()$event_fit_plot
+          }
+        } else {
+          NULL
+        }
+      })
+    })
+  })
+
+
+  event_fit_outputs <- reactive({
+    outputs <- map(1:k(), function(i) {
+      plotlyOutput(paste0("event_fit_output", i))
+    })
+
+    tagList(outputs)
+  })
+
   output$event_fit <- renderUI({
-    if (input$by_treatment && k() > 1) {
-      plotlyOutput("event_fit1", height=240*k())
-    } else {
-      plotlyOutput("event_fit1")
-    }
+    event_fit_outputs()
   })
 
 
@@ -2674,7 +2627,7 @@ server <- function(input, output, session) {
 
 
   # enrollment and event prediction plot
-  output$pred_plot1 <- renderPlotly({
+  pred_plot <- reactive({
     if (to_predict() == "Enrollment only") {
       req(pred()$enroll_pred)
       req(pred()$stage == input$stage && pred()$to_predict == to_predict())
@@ -2682,7 +2635,8 @@ server <- function(input, output, session) {
       if (input$stage != 'Design stage') {
         shiny::validate(
           need(!is.null(df()),
-               "Please upload data for real-time prediction."))
+               paste("Please upload enrollment and event data",
+                     "for real-time prediction.")))
 
         shiny::validate(
           need(target_n() > observed()$n0,
@@ -2693,16 +2647,16 @@ server <- function(input, output, session) {
       enroll_pred_df <- pred()$enroll_pred$enroll_pred_df
       if ((!input$by_treatment || k() == 1) ||
           ((input$by_treatment || input$stage == 'Design stage') &&
-           k() > 1 &&
+           k() > 1 && "treatment" %in% names(enroll_pred_df) &&
            length(table(enroll_pred_df$treatment)) == k() + 1)) {
-        g1 <- enroll_pred_plot
+        g <- enroll_pred_plot
       } else {
-        g1 <- NULL
+        g <- NULL
       }
     } else { # predict event only or predict enrollment and event
       shiny::validate(
         need(showEnrollment() || showEvent() || showOngoing(),
-             "Need at least one parameter to show on prediction plot"))
+             "Need at least one parameter to show on event prediction plot"))
 
       req(pred()$event_pred)
       req(pred()$stage == input$stage && pred()$to_predict == to_predict())
@@ -2711,7 +2665,8 @@ server <- function(input, output, session) {
       if (input$stage != 'Design stage') {
         shiny::validate(
           need(!is.null(df()),
-               "Please upload data for real-time prediction."))
+               paste("Please upload enrollment and event data",
+                     "for real-time prediction.")))
 
         if (to_predict() == "Enrollment and event")
           shiny::validate(
@@ -2736,30 +2691,56 @@ server <- function(input, output, session) {
         dfs <- dfs %>% bind_rows(pred()$event_pred$ongoing_pred_df)
 
 
-      dfs$parameter <- factor(dfs$parameter, levels = c(
-        "Enrollment", "Event", "Ongoing"))
-
-
       if ((!input$by_treatment || k() == 1) &&
           !("treatment" %in% names(dfs))) { # overall
         if (input$stage != 'Design stage') {
           dfa <- dfs %>% filter(is.na(lower))
           dfb <- dfs %>% filter(!is.na(lower))
 
-          g1 <- plotly::plot_ly() %>%
-            plotly::add_ribbons(
-              data = dfb, x = ~date, ymin = ~lower, ymax = ~upper,
-              fill = "tonexty", fillcolor = ~parameter,
-              line = list(width=0)) %>%
+          dfa_enrollment <- dfa %>% filter(parameter == "Enrollment")
+          dfa_event <- dfa %>% filter(parameter == "Event")
+          dfa_ongoing <- dfa %>% filter(parameter == "Ongoing")
+          dfb_enrollment <- dfb %>% filter(parameter == "Enrollment")
+          dfb_event <- dfb %>% filter(parameter == "Event")
+          dfb_ongoing <- dfb %>% filter(parameter == "Ongoing")
+
+          g <- plotly::plot_ly() %>%
             plotly::add_lines(
-              data = dfb, x = ~date, y = ~n,
-              color = ~parameter, colors = "Set2",
-              line = list(width=2)) %>%
-            plotly::add_lines(
-              data = dfa, x = ~date, y = ~n,
-              color = ~parameter, colors = "Set2",
+              data = dfa_enrollment, x = ~date, y = ~n,
               line = list(shape="hv", width=2),
-              name = "Observed") %>%
+              name = "observed enrollment") %>%
+            plotly::add_lines(
+              data = dfb_enrollment, x = ~date, y = ~n,
+              line = list(width=2),
+              name = "median prediction enrollment") %>%
+            plotly::add_ribbons(
+              data = dfb_enrollment, x = ~date, ymin = ~lower, ymax = ~upper,
+              fill = "tonexty", line = list(width=0),
+              name = "prediction interval enrollment") %>%
+            plotly::add_lines(
+              data = dfa_event, x = ~date, y = ~n,
+              line = list(shape="hv", width=2),
+              name = "observed_event") %>%
+            plotly::add_lines(
+              data = dfb_event, x = ~date, y = ~n,
+              line = list(width=2),
+              name = "median prediction event") %>%
+            plotly::add_ribbons(
+              data = dfb_event, x = ~date, ymin = ~lower, ymax = ~upper,
+              fill = "tonexty", line = list(width=0),
+              name = "prediction interval event") %>%
+            plotly::add_lines(
+              data = dfa_ongoing, x = ~date, y = ~n,
+              line = list(shape="hv", width=2),
+              name = "observed ongoing") %>%
+            plotly::add_lines(
+              data = dfb_ongoing, x = ~date, y = ~n,
+              line = list(width=2),
+              name = "median prediction ongoing") %>%
+            plotly::add_ribbons(
+              data = dfb_ongoing, x = ~date, ymin = ~lower, ymax = ~upper,
+              fill = "tonexty", line = list(width=0),
+              name = "prediction interval ongoing") %>%
             plotly::add_lines(
               x = rep(observed()$cutoffdt, 2),
               y = c(min(dfa$n), max(dfb$upper)),
@@ -2774,7 +2755,7 @@ server <- function(input, output, session) {
               yaxis = list(zeroline = FALSE))
 
           if (observed()$tp < observed()$t0) {
-            g1 <- g1 %>%
+            g <- g %>%
               plotly::add_lines(
                 x = rep(observed()$cutofftpdt, 2),
                 y = c(min(dfa$n), max(dfb$upper)),
@@ -2790,12 +2771,11 @@ server <- function(input, output, session) {
           }
 
           if (showEvent()) {
-            g1 <- g1 %>%
+            g <- g %>%
               plotly::add_lines(
                 x = range(dfs$date), y = rep(target_d(), 2),
                 name = 'target events', showlegend = FALSE,
-                line = list(dash="dot",
-                            color="rgba(128, 128, 128, 0.5")) %>%
+                line = list(dash="dot", color="rgba(128, 128, 128, 0.5")) %>%
               plotly::layout(
                 annotations = list(
                   x = 0.95, xref = "paper", y = target_d(),
@@ -2804,27 +2784,46 @@ server <- function(input, output, session) {
                   showarrow = FALSE))
           }
         } else { # Design stage
-          g1 <- plotly::plot_ly() %>%
-            plotly::add_ribbons(
-              data = dfs, x = ~t, ymin = ~lower, ymax = ~upper,
-              fill = "tonexty", fillcolor = ~parameter,
-              line = list(width=0)) %>%
+          dfs_enrollment <- dfs %>% filter(parameter == "Enrollment")
+          dfs_event <- dfs %>% filter(parameter == "Event")
+          dfs_ongoing <- dfs %>% filter(parameter == "Ongoing")
+
+          g <- plotly::plot_ly() %>%
             plotly::add_lines(
-              data = dfs, x = ~t, y = ~n,
-              color = ~parameter, colors = "Set2",
-              line = list(width=2)) %>%
+              data = dfs_enrollment, x = ~t, y = ~n,
+              line = list(width=2),
+              name = "median prediction enrollment") %>%
+            plotly::add_ribbons(
+              data = dfs_enrollment, x = ~t, ymin = ~lower, ymax = ~upper,
+              fill = "tonexty", line = list(width=0),
+              name = "prediction interval enrollment") %>%
+            plotly::add_lines(
+              data = dfs_event, x = ~t, y = ~n,
+              line = list(width=2),
+              name = "median prediction event") %>%
+            plotly::add_ribbons(
+              data = dfs_event, x = ~t, ymin = ~lower, ymax = ~upper,
+              fill = "tonexty", line = list(width=0),
+              name = "prediction interval event") %>%
+            plotly::add_lines(
+              data = dfs_ongoing, x = ~t, y = ~n,
+              line = list(width=2),
+              name = "median prediction ongoing") %>%
+            plotly::add_ribbons(
+              data = dfs_ongoing, x = ~t, ymin = ~lower, ymax = ~upper,
+              fill = "tonexty", line = list(width=0),
+              name = "prediction interval ongoing") %>%
             plotly::layout(
               xaxis = list(title = "Days since trial start",
                            zeroline = FALSE),
               yaxis = list(zeroline = FALSE))
 
           if (showEvent()) {
-            g1 <- g1 %>%
+            g <- g %>%
               plotly::add_lines(
                 x = range(dfs$t), y = rep(target_d(), 2),
                 name = 'target events', showlegend = FALSE,
-                line = list(dash="dot",
-                            color="rgba(128, 128, 128, 0.5")) %>%
+                line = list(dash="dot", color="rgba(128, 128, 128, 0.5")) %>%
               plotly::layout(
                 annotations = list(
                   x = 0.95, xref = "paper", y = target_d(),
@@ -2834,8 +2833,7 @@ server <- function(input, output, session) {
           }
         }
       } else if (((input$by_treatment || input$stage == 'Design stage') &&
-                  k() > 1) &&
-                 ("treatment" %in% names(dfs)) &&
+                  k() > 1) && ("treatment" %in% names(dfs)) &&
                  (length(table(dfs$treatment)) == k() + 1)) { # by treatment
 
         if (input$stage != 'Design stage') {
@@ -2848,20 +2846,51 @@ server <- function(input, output, session) {
             dfbi <- dfb %>% filter(treatment == i)
             dfai <- dfa %>% filter(treatment == i)
 
+            dfai_enrollment <- dfai %>% filter(parameter == "Enrollment")
+            dfai_event <- dfai %>% filter(parameter == "Event")
+            dfai_ongoing <- dfai %>% filter(parameter == "Ongoing")
+            dfbi_enrollment <- dfbi %>% filter(parameter == "Enrollment")
+            dfbi_event <- dfbi %>% filter(parameter == "Event")
+            dfbi_ongoing <- dfbi %>% filter(parameter == "Ongoing")
+
             g[[(i+1) %% 9999]] <- plotly::plot_ly() %>%
-              plotly::add_ribbons(
-                data = dfbi, x = ~date, ymin = ~lower, ymax = ~upper,
-                fill = "tonexty", fillcolor = ~parameter,
-                line = list(width=0)) %>%
               plotly::add_lines(
-                data = dfbi, x = ~date, y = ~n,
-                color = ~parameter, colors = "Set2",
-                line = list(width=2)) %>%
-              plotly::add_lines(
-                data = dfai, x = ~date, y = ~n,
-                color = ~parameter, colors = "Set2",
+                data = dfai_enrollment, x = ~date, y = ~n,
                 line = list(shape="hv", width=2),
-                name = "Observed") %>%
+                name = "observed enrollment") %>%
+              plotly::add_lines(
+                data = dfbi_enrollment, x = ~date, y = ~n,
+                line = list(width=2),
+                name = "median prediction enrollment") %>%
+              plotly::add_ribbons(
+                data = dfbi_enrollment, x = ~date,
+                ymin = ~lower, ymax = ~upper,
+                fill = "tonexty", line = list(width=0),
+                name = "prediction interval enrollment") %>%
+              plotly::add_lines(
+                data = dfai_event, x = ~date, y = ~n,
+                line = list(shape="hv", width=2),
+                name = "observed event") %>%
+              plotly::add_lines(
+                data = dfbi_event, x = ~date, y = ~n,
+                line = list(width=2),
+                name = "median prediction event") %>%
+              plotly::add_ribbons(
+                data = dfbi_event, x = ~date, ymin = ~lower, ymax = ~upper,
+                fill = "tonexty", line = list(width=0),
+                name = "prediction interval event") %>%
+              plotly::add_lines(
+                data = dfai_ongoing, x = ~date, y = ~n,
+                line = list(shape="hv", width=2),
+                name = "observed ongoing") %>%
+              plotly::add_lines(
+                data = dfbi_ongoing, x = ~date, y = ~n,
+                line = list(width=2),
+                name = "median prediction ongoing") %>%
+              plotly::add_ribbons(
+                data = dfbi_ongoing, x = ~date, ymin = ~lower, ymax = ~upper,
+                fill = "tonexty", line = list(width=0),
+                name = "prediction interval ongoing") %>%
               plotly::add_lines(
                 x = rep(observed()$cutoffdt, 2),
                 y = c(min(dfai$n), max(dfbi$upper)),
@@ -2930,15 +2959,35 @@ server <- function(input, output, session) {
           for (i in c(9999, 1:k())) {
             dfsi <- dfs %>% filter(treatment == i)
 
+            dfsi_enrollment <- dfsi %>% filter(parameter == "Enrollment")
+            dfsi_event <- dfsi %>% filter(parameter == "Event")
+            dfsi_ongoing <- dfsi %>% filter(parameter == "Ongoing")
+
             g[[(i+1) %% 9999]] <- plotly::plot_ly() %>%
-              plotly::add_ribbons(
-                data = dfsi, x = ~t, ymin = ~lower, ymax = ~upper,
-                fill = "tonexty", fillcolor = ~parameter,
-                line = list(width=0)) %>%
               plotly::add_lines(
-                data = dfsi, x = ~t, y = ~n,
-                color = ~parameter, colors = "Set2",
-                line = list(width=2)) %>%
+                data = dfsi_enrollment, x = ~t, y = ~n,
+                line = list(width=2),
+                name = "median prediction enrollment") %>%
+              plotly::add_ribbons(
+                data = dfsi_enrollment, x = ~t, ymin = ~lower, ymax = ~upper,
+                fill = "tonexty", line = list(width=0),
+                name = "prediction interval enrollment") %>%
+              plotly::add_lines(
+                data = dfsi_event, x = ~t, y = ~n,
+                line = list(width=2),
+                name = "median prediction event") %>%
+              plotly::add_ribbons(
+                data = dfsi_event, x = ~t, ymin = ~lower, ymax = ~upper,
+                fill = "tonexty", line = list(width=0),
+                name = "prediction interval event") %>%
+              plotly::add_lines(
+                data = dfsi_ongoing, x = ~t, y = ~n,
+                line = list(width=2),
+                name = "median prediction ongoing") %>%
+              plotly::add_ribbons(
+                data = dfsi_ongoing, x = ~t, ymin = ~lower, ymax = ~upper,
+                fill = "tonexty", line = list(width=0),
+                name = "prediction interval ongoing") %>%
               plotly::layout(
                 xaxis = list(title = "Days since trial start",
                              zeroline = FALSE),
@@ -2969,25 +3018,56 @@ server <- function(input, output, session) {
             }
           }
         }
-
-        g1 <- plotly::subplot(g, nrows = k() + 1, margin = 0.05)
       } else {
-        g1 <- NULL
+        g <- NULL
       }
-
     }
 
-    g1
+    g
+  })
 
+
+  mult_plot <- reactive({
+    (to_predict() == "Enrollment only" &&
+       (input$by_treatment || input$stage == 'Design stage') && k() > 1 &&
+       "treatment" %in% names(pred()$enroll_pred$enroll_pred_df) &&
+       length(table(pred()$enroll_pred$enroll_pred_df$treatment)) == k()+1) ||
+      (to_predict() != "Enrollment only" &&
+         (input$by_treatment || input$stage == 'Design stage') && k() > 1 &&
+         "treatment" %in% names(pred()$event_pred$event_pred_df) &&
+         length(table(pred()$event_pred$event_pred_df$treatment)) == k()+1)
+  })
+
+
+  observe({
+    walk(1:10, function(i) {
+      output[[paste0("pred_plot_output", i)]] <- renderPlotly({
+        if (i <= k() + 1) {
+          if (mult_plot()) {
+            pred_plot()[[i]]
+          } else {
+            pred_plot()
+          }
+        } else {
+          NULL
+        }
+      })
+    })
+  })
+
+
+  pred_plot_outputs <- reactive({
+    n = ifelse(mult_plot(), k() + 1, 1)
+    outputs <- map(1:n, function(i) {
+      plotlyOutput(paste0("pred_plot_output", i))
+    })
+
+    tagList(outputs)
   })
 
 
   output$pred_plot <- renderUI({
-    if (input$by_treatment && k() > 1) {
-      plotlyOutput("pred_plot1", height=250*(k()+1))
-    } else {
-      plotlyOutput("pred_plot1")
-    }
+    pred_plot_outputs()
   })
 
 
@@ -3013,253 +3093,149 @@ server <- function(input, output, session) {
       paste0("event_subject_data_", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      if (to_predict() == "Enrollment only") {
-        eventsubjectdata <- pred()$enroll_pred$newSubjects
-        if (input$stage != 'Design stage') {
-          df <- df() %>%
-            mutate(arrivalTime = as.numeric(randdt - trialsdt + 1),
-                   totalTime = arrivalTime + time - 1)
-
-          if (input$by_treatment) {
-            eventsubjectdata <- df %>%
-              mutate(draw = 0) %>%
-              select(draw, usubjid, arrivalTime,
-                     treatment, treatment_description) %>%
-              bind_rows(eventsubjectdata)
-          } else {
-            eventsubjectdata <- df %>%
-              mutate(draw = 0) %>%
-              select(draw, usubjid, arrivalTime) %>%
-              bind_rows(eventsubjectdata)
-          }
-        }
-      } else {
-        eventsubjectdata <- pred()$event_pred$newEvents
-        if (input$stage != 'Design stage') {
-          df <- df() %>%
-            mutate(arrivalTime = as.numeric(randdt - trialsdt + 1),
-                   totalTime = arrivalTime + time - 1)
-
-          if (input$by_treatment) {
-            eventsubjectdata <- df %>%
-              filter(event == 1 | dropout == 1) %>%
-              mutate(draw = 0) %>%
-              select(draw, usubjid, arrivalTime,
-                     treatment, treatment_description,
-                     time, event, dropout, totalTime) %>%
-              bind_rows(eventsubjectdata)
-          } else {
-            eventsubjectdata <- df %>%
-              filter(event == 1 | dropout == 1) %>%
-              mutate(draw = 0) %>%
-              select(draw, usubjid, arrivalTime,
-                     time, event, dropout, totalTime) %>%
-              bind_rows(eventsubjectdata)
-          }
-        }
-      }
+      eventsubjectdata <- pred()$subject_data
       writexl::write_xlsx(eventsubjectdata, file)
     }
   )
 
 
+  # loop over k0_fit, t0_fit, t1_fit, ki_fit, ti_fit plots
+  fit_expr <- purrr::map(1:5, function(iter) {
+    reactive({
+      param = switch(iter, "k0", "t0", "t1", "ki", "ti")
 
-  lapply(1:6, function(i) {
-    pwexp <- paste0("piecewise_exponential_survival_", i)
-    observeEvent(input[[paste0("add_piecewise_exponential_survival_", i)]], {
-      a = matrix(as.numeric(input[[pwexp]]), ncol=ncol(input[[pwexp]]))
-      b = matrix(a[nrow(a),], nrow=1)
-      b[1,1] = b[1,1] + 1
-      c = rbind(a, b)
-      rownames(c) = paste("Interval", seq(1,nrow(c)))
-      colnames(c) = colnames(input[[pwexp]])
-      updateMatrixInput(session, pwexp, c)
+      if (!pred_pp_only()) {
+        fit = switch(iter, fit_k0(), fit_t0(), fit_t1(), fit_ki(), fit_ti())
+
+        if (common_time_model()) {
+          g <- fit$fit_plot
+        } else {
+          g <- purrr::map(1:l(), function(h) {
+            if (!is.null(fit[[h]]$fit_plot)) {
+              fit[[h]]$fit_plot %>%
+                plotly::layout(
+                  annotations = list(
+                    x = 0.5, y = 1,
+                    text = paste0("<b>", drug_name()[h], "</b>"),
+                    xanchor = "center", yanchor = "bottom",
+                    showarrow = FALSE, xref='paper', yref='paper'))
+            } else {
+              NULL
+            }
+          })
+        }
+      } else {
+        if (common_time_model()) {
+          g <- NULL
+        } else {
+          g <- purrr::map(1:l(), function(h) NULL)
+        }
+      }
+
+      list(param = param, fit_plot = g)
     })
   })
 
 
-
-  output$k0_fit1 <- renderPlotly({
-    if (common_time_model()) {
-      g1 <- fit_k0()$fit_plot
-    } else {
-      g <- purrr::map(1:l(), function(h) {
-        fit_k0()[[h]]$fit_plot %>%
-          plotly::layout(
-            annotations = list(
-              x = 0.5, y = 1,
-              text = paste0("<b>", drug_name()[h], "</b>"),
-              xanchor = "center", yanchor = "bottom",
-              showarrow = FALSE, xref='paper', yref='paper'))
+  fit_output_expr <- purrr::map(fit_expr, function(expr) {
+    observe({
+      walk(1:12, function(i) {
+        output[[paste0(expr()$param, "_fit_output", i)]] <- renderPlotly({
+          if (i <= l()) {
+            if (!common_time_model()) {
+              expr()$fit_plot[[i]]
+            } else {
+              expr()$fit_plot
+            }
+          } else {
+            NULL
+          }
+        })
       })
-
-      g1 <- plotly::subplot(g, nrows = l(),
-                            titleX = TRUE, titleY = TRUE, margin = 0.1)
-    }
-
-    g1
-  })
-
-
-  output$k0_fit <- renderUI({
-    if (common_time_model()) {
-      plotlyOutput("k0_fit1")
-    } else {
-      plotlyOutput("k0_fit1", height=250*l())
-    }
-  })
-
-
-  output$t0_fit1 <- renderPlotly({
-    if (common_time_model()) {
-      g1 <- fit_t0()$fit_plot
-    } else {
-      g <- purrr::map(1:l(), function(h) {
-        fit_t0()[[h]]$fit_plot %>%
-          plotly::layout(
-            annotations = list(
-              x = 0.5, y = 1,
-              text = paste0("<b>", drug_name()[h], "</b>"),
-              xanchor = "center", yanchor = "bottom",
-              showarrow = FALSE, xref='paper', yref='paper'))
-      })
-
-      g1 <- plotly::subplot(g, nrows = l(),
-                            titleX = TRUE, titleY = TRUE, margin = 0.1)
-    }
-
-    g1
-  })
-
-
-  output$t0_fit <- renderUI({
-    if (common_time_model()) {
-      plotlyOutput("t0_fit1")
-    } else {
-      plotlyOutput("t0_fit1", height=250*l())
-    }
-  })
-
-
-  output$t1_fit1 <- renderPlotly({
-    if (common_time_model()) {
-      g1 <- fit_t1()$fit_plot
-    } else {
-      g <- purrr::map(1:l(), function(h) {
-        fit_t1()[[h]]$fit_plot %>%
-          plotly::layout(
-            annotations = list(
-              x = 0.5, y = 1,
-              text = paste0("<b>", drug_name()[h], "</b>"),
-              xanchor = "center", yanchor = "bottom",
-              showarrow = FALSE, xref='paper', yref='paper'))
-      })
-
-      g1 <- plotly::subplot(g, nrows = l(),
-                            titleX = TRUE, titleY = TRUE, margin = 0.1)
-    }
-
-    g1
-  })
-
-
-  output$t1_fit <- renderUI({
-    if (common_time_model()) {
-      plotlyOutput("t1_fit1")
-    } else {
-      plotlyOutput("t1_fit1", height=250*l())
-    }
-  })
-
-
-  output$ki_fit1 <- renderPlotly({
-    if (common_time_model()) {
-      g1 <- fit_ki()$fit_plot
-    } else {
-      g <- purrr::map(1:l(), function(h) {
-        fit_ki()[[h]]$fit_plot %>%
-          plotly::layout(
-            annotations = list(
-              x = 0.5, y = 1,
-              text = paste0("<b>", drug_name()[h], "</b>"),
-              xanchor = "center", yanchor = "bottom",
-              showarrow = FALSE, xref='paper', yref='paper'))
-      })
-
-      g1 <- plotly::subplot(g, nrows = l(),
-                            titleX = TRUE, titleY = TRUE, margin = 0.1)
-    }
-
-    g1
-  })
-
-
-  output$ki_fit <- renderUI({
-    if (common_time_model()) {
-      plotlyOutput("ki_fit1")
-    } else {
-      plotlyOutput("ki_fit1", height=250*l())
-    }
-  })
-
-
-
-  output$ti_fit1 <- renderPlotly({
-    if (common_time_model()) {
-      g1 <- fit_ti()$fit_plot
-    } else {
-      g <- purrr::map(1:l(), function(h) {
-        fit_ti()[[h]]$fit_plot %>%
-          plotly::layout(
-            annotations = list(
-              x = 0.5, y = 1,
-              text = paste0("<b>", drug_name()[h], "</b>"),
-              xanchor = "center", yanchor = "bottom",
-              showarrow = FALSE, xref='paper', yref='paper'))
-      })
-
-      g1 <- plotly::subplot(g, nrows = l(),
-                            titleX = TRUE, titleY = TRUE, margin = 0.1)
-    }
-
-    g1
-  })
-
-
-  output$ti_fit <- renderUI({
-    if (common_time_model()) {
-      plotlyOutput("ti_fit1")
-    } else {
-      plotlyOutput("ti_fit1", height=250*l())
-    }
-  })
-
-
-  output$di_fit1 <- renderPlotly({
-    g <- purrr::map(1:l(), function(h) {
-      fit_di()[[h]]$fit_plot %>%
-        plotly::layout(
-          annotations = list(
-            x = 0.5, y = 1,
-            text = paste0("<b>", drug_name()[h], "</b>"),
-            xanchor = "center", yanchor = "bottom",
-            showarrow = FALSE, xref='paper', yref='paper'))
     })
 
-    g1 <- plotly::subplot(g, nrows = l(),
-                          titleX = TRUE, titleY = TRUE, margin = 0.1)
+    reactive({
+      n = ifelse(!common_time_model(), l(), 1)
+      outputs <- purrr::map(1:n, function(i) {
+        plotlyOutput(paste0(expr()$param, "_fit_output", i))
+      })
 
-    g1
+      list(param = expr()$param, fit_outputs = tagList(outputs))
+    })
+  })
+
+
+  observe({
+    walk(fit_output_expr, function(expr) {
+      output[[paste0(expr()$param, "_fit")]] <- renderUI({
+        expr()$fit_outputs
+      })
+    })
+  })
+
+
+  # di fit information criteria
+  output$di_fit_ic <- renderText({
+    if (l() > 1) {
+      aic = sum(sapply(fit_di(), function(fit) fit$fit$aic))
+      bic = sum(sapply(fit_di(), function(fit) fit$fit$bic))
+      aictext = paste("Total AIC:", formatC(aic, format = "f", digits = 2))
+      bictext = paste("Total BIC:", formatC(bic, format = "f", digits = 2))
+      text1 = paste0("<i>", aictext, ", ", bictext, "</i>")
+    } else {
+      text1 = NULL
+    }
+
+    if (!is.null(text1)) text1
+  })
+
+
+  # di_fit plot
+  di_fit <- reactive({
+    purrr::map(1:l(), function(h) {
+      if (!pred_pp_only() && !is.null(fit_di()[[h]])) {
+        fit_di()[[h]]$fit_plot %>%
+          plotly::layout(
+            annotations = list(
+              x = 0.5, y = 1,
+              text = paste0("<b>", drug_name()[h], "</b>"),
+              xanchor = "center", yanchor = "bottom",
+              showarrow = FALSE, xref='paper', yref='paper'))
+      } else {
+        NULL
+      }
+    })
+  })
+
+
+  observe({
+    walk(1:12, function(i) {
+      output[[paste0("di_fit_output", i)]] <- renderPlotly({
+        if (i <= l()) {
+          di_fit()[[i]]
+        } else {
+          NULL
+        }
+      })
+    })
+  })
+
+
+  di_fit_outputs <- reactive({
+    outputs <- map(1:l(), function(i) {
+      plotlyOutput(paste0("di_fit_output", i))
+    })
+
+    tagList(outputs)
   })
 
 
   output$di_fit <- renderUI({
-    plotlyOutput("di_fit1", height=250*l())
+    di_fit_outputs()
   })
 
 
-
-  output$dosing_plot1 <- renderPlotly({
+  dosing_plot <- reactive({
     if (!is.null(dosing())) {
       req(pred()$stage == input$stage && pred()$to_predict == to_predict())
 
@@ -3273,35 +3249,30 @@ server <- function(input, output, session) {
                 xanchor = "center", yanchor = "bottom",
                 showarrow = FALSE, xref='paper', yref='paper'))
         })
-
-        g1 <- plotly::subplot(g, nrows = l(),
-                              titleX = TRUE, titleY = TRUE, margin = 0.1)
       } else {
         dfs <- dosing()$dosing_pred_df %>%
-          filter(is.na(lower)) %>%
-          mutate(parameter = "observed")
+          filter(parameter == "observed data")
 
         if (showModelBased()) {
           dfs <- dfs %>% bind_rows(
             dosing()$dosing_pred_df %>%
-              filter(!is.na(lower)) %>%
-              mutate(parameter = "model"))
+              filter(parameter == "model based prediction"))
         }
 
-        if (showProtocolBased()) {
+        if (pred_pp_only() || showProtocolBased()) {
           dfs <- dfs %>% bind_rows(
-            dosing()$dosing_pred_pp %>%
-              mutate(parameter = "protocol"))
+            dosing()$dosing_pred_df %>%
+              filter(parameter == "protocol based prediction"))
         }
-
-        dfs$parameter <- factor(dfs$parameter, levels = c(
-          "observed", "model", "protocol"))
 
         cutoffdt = dosing()$cutoffdt
 
         g <- purrr::map(1:l(), function(h) {
-          dfa <- dfs %>% filter(drug == h & is.na(lower))
-          dfb <- dfs %>% filter(drug == h & !is.na(lower))
+          dfa <- dfs %>% filter(drug == h & parameter == "observed data")
+          dfb <- dfs %>% filter(drug == h &
+                                  parameter == "model based prediction")
+          dfb_pp <- dfs %>% filter(drug == h &
+                                     parameter == "protocol based prediction")
 
           fig <- plotly::plot_ly() %>%
             plotly::add_lines(
@@ -3309,13 +3280,19 @@ server <- function(input, output, session) {
               line = list(shape ="hv", width = 2),
               name = "observed") %>%
             plotly::add_lines(
-              data = dfb, x = ~date, y = ~n,
-              color = ~parameter, colors = "Set2",
-              line = list(width = 2)) %>%
+              data = dfb, x = ~date, y = ~n, line = list(width = 2),
+              name = "median prediction model") %>%
             plotly::add_ribbons(
               data = dfb, x = ~date, ymin = ~lower, ymax = ~upper,
-              fill = "tonexty", fillcolor = ~parameter,
-              line = list(width = 0)) %>%
+              fill = "tonexty", line = list(width = 0),
+              name = "prediction interval model") %>%
+            plotly::add_lines(
+              data = dfb_pp, x = ~date, y = ~n, line = list(width = 2),
+              name = "median prediction protocol") %>%
+            plotly::add_ribbons(
+              data = dfb_pp, x = ~date, ymin = ~lower, ymax = ~upper,
+              fill = "tonexty", line = list(width = 0),
+              name = "prediction interval protocol") %>%
             plotly::layout(
               xaxis = list(title = "", zeroline = FALSE),
               yaxis = list(title = paste0("Doses to dispense ",
@@ -3327,11 +3304,12 @@ server <- function(input, output, session) {
                 xanchor = "center", yanchor = "bottom",
                 showarrow = FALSE, xref = 'paper', yref = 'paper'))
 
-          if (nrow(dfb) > 0) {
+          if (nrow(dfb) > 0 || nrow(dfb_pp) > 0) {
             fig <- fig %>% plotly::add_lines(
-              x = rep(cutoffdt, 2), y = c(min(dfa$n), max(dfb$upper)),
-              name = "cutoff", line = list(dash = "dash"),
-              showlegend = FALSE)
+              x = rep(cutoffdt, 2),
+              y = c(min(dfa$n), max(dfb$upper, dfb_pp$upper, na.rm = TRUE)),
+              line = list(dash = "dash"), showlegend = FALSE,
+              name = "cutoff")
           }
 
           if (h==1) {
@@ -3345,20 +3323,39 @@ server <- function(input, output, session) {
 
           fig
         })
-
-        g1 <- plotly::subplot(g, nrows = l(),
-                              titleX = TRUE, titleY = TRUE, margin = 0.1)
       }
     } else {
-      g1 <- NULL
+      g <- NULL
     }
 
-    g1
+    g
+  })
+
+
+  observe({
+    walk(1:12, function(i) {
+      output[[paste0("dosing_plot_output", i)]] <- renderPlotly({
+        if (i <= l()) {
+          dosing_plot()[[i]]
+        } else {
+          NULL
+        }
+      })
+    })
+  })
+
+
+  dosing_plot_outputs <- reactive({
+    outputs <- map(1:l(), function(i) {
+      plotlyOutput(paste0("dosing_plot_output", i))
+    })
+
+    tagList(outputs)
   })
 
 
   output$dosing_plot <- renderUI({
-    plotlyOutput("dosing_plot1", height=250*l())
+    dosing_plot_outputs()
   })
 
 
@@ -3367,14 +3364,11 @@ server <- function(input, output, session) {
       paste0("dosing_summary_data_", Sys.Date(), ".xlsx")
     },
     content = function(file) {
-      if (input$stage == "Design stage") {
-        dosingsummarydata <- dosing()$dosing_pred_pp
-      } else {
-        dosingsummarydata <- dosing()$dosing_pred_df
-      }
+      dosingsummarydata <- dosing()$dosing_pred_df
       writexl::write_xlsx(dosingsummarydata, file)
     }
   )
+
 
   output$downloadDosingSubjectData <- downloadHandler(
     filename = function() {
@@ -3385,6 +3379,7 @@ server <- function(input, output, session) {
       writexl::write_xlsx(dosingsubjectdata, file)
     }
   )
+
 
   observeEvent(input$add_accrualTime, {
     a = matrix(as.numeric(input$accrualTime),
@@ -3484,7 +3479,6 @@ server <- function(input, output, session) {
   })
 
 
-
   # save inputs
   output$saveInputs <- downloadHandler(
     filename = function() {
@@ -3504,6 +3498,7 @@ server <- function(input, output, session) {
         to_show_dosing = input$to_show_dosing,
         by_treatment = input$by_treatment,
         predict_dosing = predict_dosing(),
+        pred_pp_only = pred_pp_only(),
         k = k(),
         treatment_allocation = matrix(
           treatment_allocation(), ncol=1,
@@ -3623,6 +3618,10 @@ server <- function(input, output, session) {
         (x$to_predict == 'Enrollment and event' ||
          x$stage == 'Real-time after enrollment completion')) {
       updateCheckboxInput(session, "predict_dosing", value=x$predict_dosing)
+
+      if (x$predict_dosing) {
+        updateCheckboxInput(session, "pred_pp_only", value=x$pred_pp_only)
+      }
     }
 
     if (x$stage == 'Design stage' || x$by_treatment) {

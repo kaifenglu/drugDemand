@@ -62,42 +62,25 @@ df2 <- tibble(trialsdt = trialsdt,
          treatment_description, time, event, dropout, cutoffdt)
 
 
-# drug description
-drug_description_df = tibble(
+# drug by kit combinations
+kit_description_df = tibble(
   drug = c(1, 2, 3, 4),
   drug_name = c("Drug A", "Drug B", "Drug C", "Placebo"),
-  dose_strength = rep("", 4),
   kit = c(1, 2, 3, 4),
   kit_name = c("Drug A", "Drug B", "Drug C", "Placebo"),
-  dose_unit = c("kit", "kit", "kit", "kit"),
   p_kit = 1)
 
-l = nrow(drug_description_df)
+l = nrow(kit_description_df)
+
+drug_description_df <- kit_description_df %>%
+  group_by(drug, drug_name) %>%
+  slice(1) %>%
+  select(drug, drug_name)
 
 # treatment by drug combinations
-treatment_by_drug = matrix(c(1, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 1),
-                           nrow = 3, ncol = 4, byrow = TRUE)
-
-f_treatment_by_drug_df <- function(
-    treatment_by_drug, drug_name) {
-
-  k = nrow(treatment_by_drug)
-  l = ncol(treatment_by_drug)
-
-  tibble(treatment = rep(1:k, l),
-         drug = rep(1:l, each=k),
-         drug_name = rep(drug_name[1:l], each=k),
-         included = as.logical(treatment_by_drug)) %>%
-    filter(included) %>%
-    select(treatment, drug, drug_name)
-}
-
-l = nrow(drug_description_df)
-drug_name = drug_description_df$drug_name
-
-treatment_by_drug_df <- f_treatment_by_drug_df(
-  treatment_by_drug, drug_name)
-
+treatment_by_drug_df = tibble(
+  treatment = c(1, 3, 1, 2, 2, 3),
+  drug = c(1, 1, 2, 3, 4, 4))
 
 
 # function to impute dosing records
@@ -248,7 +231,8 @@ vf_new1 <- df2 %>% select(-c(event, dropout))
 vf <- f_draw(
   pi0, lambda0, muT0, sigmaT0, mu0, sigma0,
   pi, lambda, muT, sigmaT, mud, sigmab, sigmae,
-  vf_new, vf_new1, treatment_by_drug_df)
+  vf_new, vf_new1, treatment_by_drug_df) %>%
+  left_join(drug_description_df, by = "drug")
 
 vf1 <- purrr::pmap_dfr(
   list(vf$drug, vf$usubjid, vf$visit, vf$dose), f_kit)
@@ -257,9 +241,9 @@ vf1 <- purrr::pmap_dfr(
 visitview2 <- vf1 %>%
   inner_join(vf, by = c("drug", "usubjid", "visit")) %>%
   mutate(date = as.Date(day - 1, origin = randdt),
-         dose_strength = "", dose_unit = "kit") %>%
-  select(usubjid, visit, date, drug, drug_name, dose_strength,
-         dose_unit, kit_number, dispensed_quantity) %>%
+         kit = drug, kit_name = drug_name) %>%
+  select(usubjid, visit, date, drug, drug_name, kit, kit_name,
+         kit_number, dispensed_quantity) %>%
   arrange(usubjid, date, kit_number)
 
 
@@ -280,7 +264,7 @@ df1 <- df2 %>%
 visitview1 <- visitview2 %>%
   filter(date <= cutoffdt)
 
-dosing_schedule_df = dplyr::tibble(
+dosing_schedule_df = tibble(
   kit = c(1, 2, 3, 4),
   target_days = c(21, 21, 21, 21),
   target_dose = c(2, 3, 2, 1),
@@ -288,8 +272,8 @@ dosing_schedule_df = dplyr::tibble(
 
 # save to data/ folder
 
-usethis::use_data(drug_description_df, overwrite = TRUE)
-usethis::use_data(treatment_by_drug, overwrite = TRUE)
+usethis::use_data(kit_description_df, overwrite = TRUE)
+usethis::use_data(treatment_by_drug_df, overwrite = TRUE)
 usethis::use_data(dosing_schedule_df, overwrite = TRUE)
 
 usethis::use_data(df1, overwrite = TRUE)
